@@ -21,43 +21,56 @@ def build_prompt(data: dict) -> str:
 
 【顯性命盤（西曆）】
 原始數字串：{manifest['all_digits']}
-各位相加總數：{manifest['raw_sum']} → 總數：{manifest['total']} → 個位數：{manifest['single']}
-命盤含義：{manifest['total']} = {data.get('manifest_meaning', {}).get('name', '')}（{data.get('manifest_meaning', {}).get('keyword', '')}）
-命盤圈數分佈：{manifest['grid']}
+加總：{manifest['raw_sum']} → 總數：{manifest['total']} → 個位數：{manifest['single']}
+含義：{manifest['total']} = {data.get('manifest_meaning', {}).get('name', '')}（{data.get('manifest_meaning', {}).get('keyword', '')}）
+圈數分佈：{manifest['grid']}
 強勢數（≥5圈）：{manifest['strong_numbers'] if manifest['strong_numbers'] else '無'}
 空缺數：{manifest['missing_numbers'] if manifest['missing_numbers'] else '無'}
 
 【隱性命盤（農曆）】
 原始數字串：{hidden.get('all_digits', '無')}
-各位相加總數：{hidden.get('raw_sum', '無')} → 總數：{hidden.get('total', '無')} → 個位數：{hidden.get('single', '無')}
-命盤含義：{hidden.get('total', '')} = {data.get('hidden_meaning', {}).get('name', '')}（{data.get('hidden_meaning', {}).get('keyword', '')}）
+加總：{hidden.get('raw_sum', '無')} → 總數：{hidden.get('total', '無')} → 個位數：{hidden.get('single', '無')}
+含義：{hidden.get('total', '')} = {data.get('hidden_meaning', {}).get('name', '')}（{data.get('hidden_meaning', {}).get('keyword', '')}）
+圈數分佈：{hidden.get('grid', {})}
+強勢數（≥5圈）：{hidden.get('strong_numbers') if hidden.get('strong_numbers') else '無'}
+空缺數：{hidden.get('missing_numbers') if hidden.get('missing_numbers') else '無'}
 
 【流年資料（今年 {data['personal_year_current']['year']}）】
 流年數：{data['personal_year_current']['total']}（個位 {data['personal_year_current']['single']}）
 今年主題：{data['year_theme']}
 
-請按以下結構分析，每個部分都要具體且有溫度，避免空泛的描述：
+請按以下結構分析，每個部分都要具體且有溫度，避免空泛的描述。
+⚠️ 重要：顯性命盤與隱性命盤必須合併一起解讀，不可拆開分析。每個部分都要同時考慮兩個命盤的互動與影響。
 
-**一、顯性命盤深度解析**
-解讀總數 {manifest['total']} 與個位 {manifest['single']} 的意涵，這個人的核心性格、人生課題與天賦。
+**一、顯性＋隱性命盤綜合解析**
+同時解讀顯性命數（西曆{manifest['total']}/{manifest['single']}）與隱性命數（農曆{hidden.get('total', '?')}/{hidden.get('single', '?')}）：
+- 兩個命盤呈現的核心性格與天賦
+- 顯性（外在表現）與隱性（內在驅動）之間的關係：是互補、共鳴還是張力？
+- 這個組合對人生方向的整體影響
 
-**二、隱性命盤解析**
-隱性命盤反映潛意識層面的特質，與顯性命盤的互補或張力。
+**二、命盤特殊能量**
+綜合兩個命盤分析：
+- 強勢數帶來的特質與挑戰（若有）
+- 空缺數反映的人生課題與補足方向
+- 兩個命盤的空缺或強勢數若有重疊，說明其加乘效果
 
-**三、命盤特殊影響**
-- 若有強勢數（圈數≥5）：說明這個數字過度強化帶來的特質與挑戰
-- 空缺數的影響：需要學習和補足的課題
+**三、適合從事的工作**
+根據顯性＋隱性命盤合併推薦 5 個最適合的職業方向，說明為何這個組合適合這些職業。
 
-**四、適合從事的工作**
-根據命盤推薦 5 個最適合的職業方向，並說明原因。
-
-**五、感情與人際**
+**四、感情與人際**
 - 最相容的生命靈數類型（{data['compatible_numbers']}）及原因
-- 感情模式與注意事項
+- 結合兩個命盤說明感情模式、需要注意的事項
 
-**六、流年分析（{data['personal_year_current']['year']}年）**
+**五、流年分析（{data['personal_year_current']['year']}年）**
 今年的整體能量、重點方向、機會與挑戰。
 列出上半年（1-6月）與下半年（7-12月）的重點月份分析。
+
+**六、給自己的一句話**
+用一段溫暖有力量的話，總結這個顯性＋隱性命盤組合的核心人生訊息。
+
+語氣要真誠、具體，避免過於玄秘，讓沒有靈數基礎的人也能理解。"""
+
+    return prompt
 
 **七、給自己的一句話**
 用一段溫暖有力量的話總結這個命盤的核心訊息。
@@ -85,7 +98,67 @@ def get_ai_reading(data: dict, api_key: str) -> str:
         return f"AI 解讀暫時無法使用：{str(e)}\n\n請稍後再試，或聯絡管理員。"
 
 
-def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
+def get_year_detail(data: dict, api_key: str) -> str:
+    """
+    流年詳細分析，包含本命年說明
+    """
+    client = anthropic.Anthropic(api_key=api_key)
+    py = data["personal_year_current"]
+    solar = data["solar"]
+    birth_single = data["manifest"]["single"]
+    is_personal_year = (py["single"] == birth_single)
+    monthly = data["monthly_current"]
+    month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
+    monthly_str = "、".join([f"{month_names[i]}月={pm['single']}" for i, pm in enumerate(monthly)])
+
+    personal_year_note = ""
+    if is_personal_year:
+        personal_year_note = f"\n⭐ 特別注意：這是命主的本命年（流年數={birth_single}，與生命靈數相同），能量特別強烈，請在本命年段落中重點說明本命年的意義與注意事項。"
+
+    prompt = f"""你是生命靈數分析師。請用繁體中文為以下命主做詳細的流年分析。
+
+出生日期：{solar['year']}/{solar['month']:02d}/{solar['day']:02d}
+生命靈數（主命數）：{birth_single}（總數 {data['manifest']['total']}）
+{py['year']}年流年數：{py['single']}（總數 {py['total']}）
+各月流月數：{monthly_str}
+{personal_year_note}
+
+請按以下結構分析，內容要具體、有深度：
+
+**{py['year']}年流年數 {py['single']} 完整解析**
+
+**一、今年整體能量與主題**
+深入說明流年數 {py['single']} 的意義，這一年的核心能量是什麼，適合做什麼、不適合做什麼（4-5句）
+
+**二、事業與財運**
+今年在事業發展、財務機會上的具體建議（3-4句）
+
+**三、感情與人際關係**
+感情運勢、人際互動的重點提醒（3-4句）
+
+**四、健康與身心**
+需要特別注意的健康方向（2-3句）
+
+{"**五、本命年特別說明**\\n本命年意味著什麼？會帶來哪些特殊的機遇與挑戰？如何善用本命年的能量？（4-5句）" if is_personal_year else "**五、上下半年重點**"}
+
+**六、各季度重點月份**
+根據流月數，指出今年最重要的3-4個月份及其意義
+
+**七、給自己的年度一句話**
+一段有力量的總結"""
+
+    try:
+        message = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
+    except Exception as e:
+        return f"流年分析暫時無法使用：{str(e)}"
+
+
+(data: dict, month: int, api_key: str) -> str:
     """
     單月詳細流月分析
     """

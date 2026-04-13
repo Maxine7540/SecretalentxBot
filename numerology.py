@@ -33,17 +33,20 @@ def reduce_to_single(n: int):
 # ───────────────────────────────────────────────
 # 農曆轉換
 # ───────────────────────────────────────────────
+ZODIAC_LIST = ["鼠","牛","虎","兔","龍","蛇","馬","羊","猴","雞","狗","豬"]
+
 def solar_to_lunar(year: int, month: int, day: int) -> dict:
-    """西曆轉農曆，返回農曆年月日及生肖天干地支"""
+    """西曆轉農曆，返回農曆年月日及生肖"""
     try:
         lunar = LunarDate.fromSolarDate(year, month, day)
+        zodiac = ZODIAC_LIST[(lunar.year - 4) % 12]
         return {
             "year": lunar.year,
             "month": lunar.month,
             "day": lunar.day,
             "is_leap_month": lunar.isLeapMonth,
-            "zodiac": lunar.zodiac,
-            "display": f"{lunar.year}年{'閏' if lunar.isLeapMonth else ''}{lunar.month}月{lunar.day}日"
+            "zodiac": zodiac,
+            "display": f"{lunar.year}年{'閏' if lunar.isLeapMonth else ''}{lunar.month}月{lunar.day}日（{zodiac}年）"
         }
     except Exception as e:
         return {"error": str(e)}

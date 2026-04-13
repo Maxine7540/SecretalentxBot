@@ -11,7 +11,7 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
 from numerology import full_analysis, NUMBER_MEANINGS, PERSONAL_YEAR_THEMES
-from ai_reader import get_ai_reading, get_monthly_detail
+from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail
 
 # ── 設定 ──────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -29,78 +29,75 @@ user_data_store = {}
 
 # ── 訊息格式化工具 ────────────────────────────
 def format_grid(grid: dict) -> str:
-    """格式化命盤九宮格"""
+    """格式化命盤圈數，清晰列表顯示"""
     lines = []
-    for row in [[7, 8, 9], [4, 5, 6], [1, 2, 3]]:
-        parts = []
-        for n in row:
-            count = grid.get(n, 0)
-            if count == 0:
-                parts.append(f"  ◻{n} ")
-            else:
-                parts.append(f"  {'●' * count}{n}")
-        lines.append("".join(parts))
+    for n in range(1, 10):
+        count = grid.get(n, 0)
+        if count == 0:
+            lines.append(f"  {n}  空缺")
+        else:
+            circles = "●" * count
+            lines.append(f"  {n}  {circles} {count}圈")
     return "\n".join(lines)
 
 
-def format_manifest(manifest: dict, meaning: dict) -> str:
-    total = manifest["total"]
-    single = manifest["single"]
-    name = meaning.get("name", "")
-    keyword = meaning.get("keyword", "")
+def format_combined_chart(data: dict) -> str:
+    """將顯性命盤與隱性命盤合併成一個完整訊息"""
+    manifest = data["manifest"]
+    hidden = data["hidden"]
+    m_meaning = data.get("manifest_meaning", {})
+    h_meaning = data.get("hidden_meaning", {})
 
-    text = f"📅 *西曆 {manifest['date_str']}*\n"
-    text += f"數字加總：`{manifest['all_digits']}` → {manifest['raw_sum']} → **{total}** → 個位 **{single}**\n\n"
-    text += f"✨ *顯性命數：{total}（{single}）— {name}*\n"
-    text += f"關鍵詞：{keyword}\n\n"
-    text += "命盤圈數：\n```\n" + format_grid(manifest["grid"]) + "\n```\n"
+    # ── 標題 ──
+    text = "🌟 *完整命盤總覽*\n"
+    text += "━━━━━━━━━━━━━━━\n\n"
 
+    # ── 顯性命盤 ──
+    text += "☀️ *顯性命盤（西曆）*\n"
+    text += f"📅 {manifest['date_str']}\n"
+    text += f"加總：{manifest['all_digits']} → {manifest['raw_sum']} → *{manifest['total']}* → 個位 *{manifest['single']}*\n"
+    text += f"命數：*{manifest['total']}（{manifest['single']}）{m_meaning.get('name', '')}*\n"
+    text += f"關鍵詞：{m_meaning.get('keyword', '')}\n\n"
+    text += "圈數分佈：\n```\n" + format_grid(manifest["grid"]) + "\n```"
     if manifest["strong_numbers"]:
         nums = "、".join([f"{k}（{v}圈）" for k, v in manifest["strong_numbers"].items()])
-        text += f"\n⚡ 強勢數：{nums}\n"
+        text += f"\n⚡ 強勢數：{nums}"
     if manifest["missing_numbers"]:
         nums = "、".join(str(n) for n in manifest["missing_numbers"])
-        text += f"🕳 空缺數：{nums}\n"
+        text += f"\n🕳 空缺數：{nums}"
 
-    return text
+    text += "\n\n━━━━━━━━━━━━━━━\n\n"
 
-
-def format_hidden(hidden: dict, meaning: dict) -> str:
+    # ── 隱性命盤 ──
     if "error" in hidden:
-        return f"⚠️ 農曆轉換失敗：{hidden['error']}"
+        text += f"🌙 *隱性命盤（農曆）*\n⚠️ 農曆轉換失敗：{hidden['error']}\n"
+    else:
+        text += "🌙 *隱性命盤（農曆）*\n"
+        text += f"📅 {hidden['date_str']}\n"
+        text += f"加總：{hidden['all_digits']} → {hidden['raw_sum']} → *{hidden['total']}* → 個位 *{hidden['single']}*\n"
+        text += f"命數：*{hidden['total']}（{hidden['single']}）{h_meaning.get('name', '')}*\n"
+        text += f"關鍵詞：{h_meaning.get('keyword', '')}\n\n"
+        text += "圈數分佈：\n```\n" + format_grid(hidden["grid"]) + "\n```"
+        if hidden["strong_numbers"]:
+            nums = "、".join([f"{k}（{v}圈）" for k, v in hidden["strong_numbers"].items()])
+            text += f"\n⚡ 強勢數：{nums}"
+        if hidden["missing_numbers"]:
+            nums = "、".join(str(n) for n in hidden["missing_numbers"])
+            text += f"\n🕳 空缺數：{nums}"
 
-    total = hidden["total"]
-    single = hidden["single"]
-    name = meaning.get("name", "")
-    keyword = meaning.get("keyword", "")
-
-    text = f"🌙 *農曆 {hidden['date_str']}*\n"
-    text += f"數字加總：`{hidden['all_digits']}` → {hidden['raw_sum']} → **{total}** → 個位 **{single}**\n\n"
-    text += f"🌕 *隱性命數：{total}（{single}）— {name}*\n"
-    text += f"關鍵詞：{keyword}\n\n"
-    text += "命盤圈數：\n```\n" + format_grid(hidden["grid"]) + "\n```\n"
-
-    if hidden["strong_numbers"]:
-        nums = "、".join([f"{k}（{v}圈）" for k, v in hidden["strong_numbers"].items()])
-        text += f"\n⚡ 強勢數：{nums}\n"
-    if hidden["missing_numbers"]:
-        nums = "、".join(str(n) for n in hidden["missing_numbers"])
-        text += f"🕳 空缺數：{nums}\n"
+    text += "\n\n━━━━━━━━━━━━━━━\n"
+    text += "💡 點「AI深度解讀」獲得顯性＋隱性命盤的綜合分析"
 
     return text
 
 
-def format_yearly_grid(py: dict, monthly: list, year: int) -> str:
-    month_names = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
-    text = f"📆 *{year}年流年：{py['total']}（{py['single']}）*\n"
+def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) -> str:
+    is_personal_year = (py["single"] == birth_single)
+    text = f"📆 *{year}年流年數：{py['total']}（個位 {py['single']}）*\n"
+    if is_personal_year:
+        text += "⭐ 本命年！能量特別強烈，點「流年詳解」了解更多\n"
     text += f"主題：{PERSONAL_YEAR_THEMES.get(py['single'], '')}\n\n"
-    text += "*各月流月數：*\n"
-    for i, pm in enumerate(monthly):
-        text += f"  {month_names[i]}月：**{pm['single']}**"
-        if (i + 1) % 4 == 0:
-            text += "\n"
-        else:
-            text += "　"
+    text += "💡 點下方按鈕可查看流年詳解或各月流月分析"
     return text
 
 
@@ -198,24 +195,16 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ 計算出現問題：{e}")
         return ConversationHandler.END
 
-    # 顯示基本命盤
-    manifest_text = format_manifest(data["manifest"], data.get("manifest_meaning", {}))
-    hidden_text = format_hidden(data["hidden"], data.get("hidden_meaning", {}))
+    # 顯示合併命盤（顯性＋隱性合為一則）
+    combined_text = format_combined_chart(data)
     yearly_text = format_yearly_grid(
         data["personal_year_current"],
         data["monthly_current"],
-        data["personal_year_current"]["year"]
+        data["personal_year_current"]["year"],
+        data["manifest"]["single"]
     )
 
-    await update.message.reply_text(
-        "═══════════════\n"
-        "🌟 *你的生命靈數命盤*\n"
-        "═══════════════\n\n" +
-        manifest_text,
-        parse_mode="Markdown"
-    )
-
-    await update.message.reply_text(hidden_text, parse_mode="Markdown")
+    await update.message.reply_text(combined_text, parse_mode="Markdown")
     await update.message.reply_text(yearly_text, parse_mode="Markdown")
 
     # 顯示選單按鈕
@@ -226,9 +215,10 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("💕 感情對象", callback_data="love"),
         ],
         [
-            InlineKeyboardButton("📅 本月詳細流月", callback_data="month_now"),
+            InlineKeyboardButton("📅 流年詳解", callback_data="year_detail"),
             InlineKeyboardButton("📆 下一年流年", callback_data="next_year"),
         ],
+        [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -254,7 +244,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "ai_full":
         await query.edit_message_text("🤖 AI 正在深度解讀你的命盤，這需要約 30 秒...")
         reading = get_ai_reading(data, CLAUDE_API_KEY)
-        # 分段發送（避免超過 TG 字數限制）
         chunks = [reading[i:i+3500] for i in range(0, len(reading), 3500)]
         for i, chunk in enumerate(chunks):
             if i == 0:
@@ -288,29 +277,74 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"你的命數 {single} 最相容的對象：\n\n"
         for n in compatible:
             meaning = NUMBER_MEANINGS.get(n, {})
-            text += f"• 命數 **{n}**（{meaning.get('name', '')}）— {meaning.get('keyword', '')}\n"
+            text += f"• 命數 *{n}*（{meaning.get('name', '')}）— {meaning.get('keyword', '')}\n"
         text += "\n💡 相容不代表一定合適，命盤僅供參考"
         await context.bot.send_message(
             chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
         )
 
-    elif action == "month_now":
-        current_month = date.today().month
+    elif action == "year_detail":
+        py = data["personal_year_current"]
+        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年詳解，請稍候...")
+        detail = get_year_detail(data, CLAUDE_API_KEY)
+        chunks = [detail[i:i+3500] for i in range(0, len(detail), 3500)]
+        for chunk in chunks:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=chunk,
+                parse_mode="Markdown"
+            )
+
+    elif action == "month_menu":
+        # 顯示12個月份按鈕
+        month_names = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]
+        monthly = data["monthly_current"]
+        keyboard = []
+        row = []
+        for i, pm in enumerate(monthly):
+            row.append(InlineKeyboardButton(
+                f"{month_names[i]}（{pm['single']}）",
+                callback_data=f"month_{i+1}"
+            ))
+            if len(row) == 3:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"📅 正在分析 {date.today().year} 年 {current_month} 月的流月..."
+            text=f"🗓 *{data['personal_year_current']['year']}年 — 選擇要分析的月份：*\n括號內為該月流月數",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
         )
-        detail = get_monthly_detail(data, current_month, CLAUDE_API_KEY)
+        return SHOW_MENU
+
+    elif action.startswith("month_"):
+        target_month = int(action.split("_")[1])
+        year = data["personal_year_current"]["year"]
+        await query.edit_message_text(f"📅 正在分析 {year} 年 {target_month} 月的流月，請稍候約15秒...")
+        detail = get_monthly_detail(data, target_month, CLAUDE_API_KEY)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"🗓 *{date.today().year}年{current_month}月流月分析*\n\n{detail}",
+            text=f"🗓 *{year}年{target_month}月流月分析*\n\n{detail}",
             parse_mode="Markdown"
         )
 
     elif action == "next_year":
         next_py = data["personal_year_next"]
         next_monthly = data["monthly_next"]
-        text = format_yearly_grid(next_py, next_monthly, next_py["year"])
+        birth_single = data["manifest"]["single"]
+        text = format_yearly_grid(next_py, next_monthly, next_py["year"], birth_single)
+        # 附上12個月流月數一覽
+        month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
+        text += "\n\n*各月流月數一覽：*\n"
+        for i, pm in enumerate(next_monthly):
+            text += f"  {month_names[i]}月：{pm['single']}"
+            if (i + 1) % 4 == 0:
+                text += "\n"
+            else:
+                text += "　　"
         await context.bot.send_message(
             chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
         )
@@ -323,9 +357,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("💕 感情對象", callback_data="love"),
         ],
         [
-            InlineKeyboardButton("📅 本月詳細流月", callback_data="month_now"),
+            InlineKeyboardButton("📅 流年詳解", callback_data="year_detail"),
             InlineKeyboardButton("📆 下一年流年", callback_data="next_year"),
         ],
+        [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
