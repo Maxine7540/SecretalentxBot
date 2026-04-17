@@ -19,14 +19,22 @@ def digit_sum(n: int) -> int:
 
 def reduce_to_single(n: int):
     """
-    返回 (總數, 個位數)
-    總數保留在 10-22 之間有意義的主命數，超過則繼續相加
+    返回 (天賦數, 本命靈數)
+    天賦數 = 第一次加總後的兩位數（保留，不再縮減）
+    本命靈數 = 繼續縮到個位數（1-9）
+    特例：11、22 為主命數，保留不縮
     """
+    # 第一步：把所有位數加到兩位數（≤99）
     total = n
-    # 先把所有位數加到兩位數以下
-    while total > 22:
+    while total > 99:
         total = sum(int(d) for d in str(total))
-    single = digit_sum(total)
+
+    # 本命靈數：繼續縮到個位數，但保留 11、22 主命數
+    single = total
+    if single not in (11, 22):
+        while single > 9:
+            single = sum(int(d) for d in str(single))
+
     return total, single
 
 
@@ -64,13 +72,18 @@ def calc_manifest_chart(year: int, month: int, day: int) -> dict:
     raw_sum = sum(int(d) for d in all_digits)
     total, single = reduce_to_single(raw_sum)
 
-    # 命盤圈數（記錄每個數字出現次數，0不計）
+    # 命盤圈數第一層：生日數字串（0不計）
     grid = {}
     for d in all_digits:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
-    # 本命靈數額外加一圈
+    # 命盤圈數第二層：天賦數（total）的各位數字（0不計）
+    for d in str(total):
+        if d != '0':
+            grid[int(d)] = grid.get(int(d), 0) + 1
+
+    # 命盤圈數第三層：本命靈數（single）額外再加一圈
     grid[single] = grid.get(single, 0) + 1
 
     # 強勢數（單盤 ≥3 圈）
@@ -78,8 +91,13 @@ def calc_manifest_chart(year: int, month: int, day: int) -> dict:
     # 空缺數（1-9 中未出現的）
     missing = [i for i in range(1, 10) if i not in grid]
 
-    # 計算過程字串
-    digits_display = "+".join(all_digits)
+    # 計算過程：每個數字用 + 連接，顯示 raw_sum，再顯示 total 拆解
+    digits_display = "+".join(list(all_digits))
+    # 第二步拆解：如 34 → 3+4 = 7
+    if total > 9:
+        step2 = "+".join(list(str(total))) + f" = {single}"
+    else:
+        step2 = None
 
     return {
         "date_str": f"{year}/{month:02d}/{day:02d}",
@@ -88,6 +106,7 @@ def calc_manifest_chart(year: int, month: int, day: int) -> dict:
         "raw_sum": raw_sum,
         "total": total,
         "single": single,
+        "step2": step2,
         "grid": grid,
         "strong_numbers": strong,
         "missing_numbers": missing,
@@ -107,18 +126,28 @@ def calc_hidden_chart(lunar: dict) -> dict:
     raw_sum = sum(int(d) for d in all_digits)
     total, single = reduce_to_single(raw_sum)
 
+    # 命盤圈數第一層：生日數字串（0不計）
     grid = {}
     for d in all_digits:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
-    # 本命靈數額外加一圈
+    # 命盤圈數第二層：天賦數（total）的各位數字（0不計）
+    for d in str(total):
+        if d != '0':
+            grid[int(d)] = grid.get(int(d), 0) + 1
+
+    # 命盤圈數第三層：本命靈數（single）額外再加一圈
     grid[single] = grid.get(single, 0) + 1
 
     strong = {k: v for k, v in grid.items() if v >= 3}
     missing = [i for i in range(1, 10) if i not in grid]
 
-    digits_display = "+".join(all_digits)
+    digits_display = "+".join(list(all_digits))
+    if total > 9:
+        step2 = "+".join(list(str(total))) + f" = {single}"
+    else:
+        step2 = None
 
     return {
         "date_str": lunar["display"],
@@ -127,6 +156,7 @@ def calc_hidden_chart(lunar: dict) -> dict:
         "raw_sum": raw_sum,
         "total": total,
         "single": single,
+        "step2": step2,
         "grid": grid,
         "strong_numbers": strong,
         "missing_numbers": missing,

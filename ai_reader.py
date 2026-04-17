@@ -111,7 +111,7 @@ def get_ai_reading(data: dict, api_key: str) -> str:
 
     try:
         message = client.messages.create(
-            model="claude-opus-4-5",
+            model="claude-opus-4-5-20251101",
             max_tokens=3500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -170,7 +170,7 @@ def get_year_detail(data: dict, api_key: str) -> str:
 
     try:
         message = client.messages.create(
-            model="claude-opus-4-5",
+            model="claude-opus-4-5-20251101",
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -217,7 +217,7 @@ def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
 
     try:
         message = client.messages.create(
-            model="claude-opus-4-5",
+            model="claude-opus-4-5-20251101",
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )

@@ -54,18 +54,16 @@ def format_combined_chart(data: dict) -> str:
     solar = data["solar"]
 
     # 加總過程字串（西曆）
-    digits_str = "+".join(manifest["all_digits"])
-    calc_m = f"{digits_str} = {manifest['raw_sum']}"
-    if manifest['raw_sum'] != manifest['total']:
-        calc_m += f" → {manifest['total']}"
-    calc_m += f" → 個位 *{manifest['single']}*"
+    calc_m = f"{manifest['digits_display']} = {manifest['raw_sum']}"
+    if manifest.get("step2"):
+        calc_m += f" → {manifest['step2']}"
 
     text = "✨ *靈數命盤*\n\n"
 
     # ── 外在性格命盤（西曆）──
-    text += f"☀️ *西曆生日*\n"
+    text += "☀️ *西曆生日*\n"
     text += f"{solar['year']} / {solar['month']:02d} / {solar['day']:02d}\n"
-    text += f"`{calc_m}`\n"
+    text += f"{calc_m}\n"
     text += f"天賦數 *{manifest['total']}*　本命靈數 *{manifest['single']}*\n"
     text += f"{m_meaning.get('name', '')} — {m_meaning.get('keyword', '')}\n\n"
     text += "*外在性格命盤*\n"
@@ -88,15 +86,13 @@ def format_combined_chart(data: dict) -> str:
         text += f"🌙 *農曆生日*\n⚠️ 農曆轉換失敗：{hidden['error']}\n"
     else:
         lunar = data["lunar"]
-        digits_str_h = "+".join(hidden["all_digits"])
-        calc_h = f"{digits_str_h} = {hidden['raw_sum']}"
-        if hidden['raw_sum'] != hidden['total']:
-            calc_h += f" → {hidden['total']}"
-        calc_h += f" → 個位 *{hidden['single']}*"
+        calc_h = f"{hidden['digits_display']} = {hidden['raw_sum']}"
+        if hidden.get("step2"):
+            calc_h += f" → {hidden['step2']}"
 
         text += f"🌙 *農曆生日*\n"
         text += f"{lunar['year']} / {lunar['month']:02d} / {lunar['day']:02d}（{lunar.get('zodiac','')}年）\n"
-        text += f"`{calc_h}`\n"
+        text += f"{calc_h}\n"
         text += f"天賦數 *{hidden['total']}*　本命靈數 *{hidden['single']}*\n"
         text += f"{h_meaning.get('name', '')} — {h_meaning.get('keyword', '')}\n\n"
         text += "*內在精神命盤*\n"
@@ -167,8 +163,8 @@ def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) ->
 # ── 指令處理 ──────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[
-        KeyboardButton("/start"),
-        KeyboardButton("/analyze"),
+        KeyboardButton("🔢 開始 /start"),
+        KeyboardButton("📅 輸入生日 /analyze"),
     ]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
