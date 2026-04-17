@@ -162,23 +162,20 @@ def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) ->
 
 # ── 指令處理 ──────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        KeyboardButton("/start"),
-        KeyboardButton("/analyze"),
-    ]]
+    keyboard = [[KeyboardButton("開始")]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
-        "✨ *歡迎來到生命靈數 Bot！*\n\n"
-        "我可以為你計算：\n"
-        "☀️ 外在性格命盤（西曆）\n"
-        "🌙 內在精神命盤（農曆）\n"
-        "🟢 綜合命盤圈數分析\n"
-        "🔮 AI 綜合命盤深度解析\n"
-        "📅 流年流月詳細分析\n\n"
-        "點下方按鈕開始 👇",
-        parse_mode="Markdown",
+        "✨ 歡迎來到生命靈數 Bot！\n\n"
+        "我可以為你找出你的隱藏天賦：\n"
+        "☀️ 外在性格命盤\n"
+        "🌙 內在精神命盤\n"
+        "🔮 綜合命盤深度解析\n\n"
+        "📅 請輸入你的西曆出生日期\n"
+        "格式：YYYY/MM/DD\n"
+        "範例：1990/05/15",
         reply_markup=reply_markup
     )
+    return ASK_DATE
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -193,15 +190,6 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📅 請輸入你的*西曆出生日期*\n\n"
-        "格式：YYYY/MM/DD\n"
-        "範例：1990/05/15",
-        parse_mode="Markdown"
-    )
-    return ASK_DATE
 
 
 async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -460,18 +448,22 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("analyze", analyze)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("analyze", start),
+            MessageHandler(filters.Regex("^開始$"), start),
+        ],
         states={
             ASK_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date)],
             ASK_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_time)],
             SHOW_MENU: [CallbackQueryHandler(handle_callback)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
     )
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(conv_handler)
+    app.add_handler(CommandHandler("help", help_cmd))
 
     print("🤖 生命靈數 Bot 已啟動...")
     app.run_polling()
