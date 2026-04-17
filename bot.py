@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 # 對話狀態
 ASK_DATE, ASK_TIME, SHOW_MENU = range(3)
@@ -296,7 +296,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "ai_full":
         await query.edit_message_text("🔮 正在進行綜合命盤分析，請稍候約 60 秒，請勿重複點擊...")
         try:
-            reading = get_ai_reading(data, GROQ_API_KEY)
+            reading = get_ai_reading(data, OPENROUTER_API_KEY)
             chunks = [reading[i:i+4000] for i in range(0, len(reading), 4000)]
             for i, chunk in enumerate(chunks):
                 header = "🔮 綜合命盤分析\n\n" if i == 0 else ""
@@ -337,7 +337,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "year_detail":
         py = data["personal_year_current"]
         await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年詳解，請稍候...")
-        detail = get_year_detail(data, GROQ_API_KEY)
+        detail = get_year_detail(data, OPENROUTER_API_KEY)
         chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
         for chunk in chunks:
             try:
@@ -380,7 +380,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_month = int(action.split("_")[1])
         year = data["personal_year_current"]["year"]
         await query.edit_message_text(f"📅 正在分析 {year} 年 {target_month} 月的流月，請稍候約15秒...")
-        detail = get_monthly_detail(data, target_month, GROQ_API_KEY)
+        detail = get_monthly_detail(data, target_month, OPENROUTER_API_KEY)
         try:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -442,8 +442,8 @@ def main():
     if not BOT_TOKEN:
         print("錯誤：請設定環境變數 BOT_TOKEN")
         return
-    if not GROQ_API_KEY:
-        print("警告：未設定 GROQ_API_KEY，AI 解讀功能將無法使用")
+    if not OPENROUTER_API_KEY:
+        print("警告：未設定 OPENROUTER_API_KEY，AI 解讀功能將無法使用")
 
     app = Application.builder().token(BOT_TOKEN).build()
 

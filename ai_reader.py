@@ -1,5 +1,5 @@
 """
-AI 解讀模組 - 使用 Groq API（免費）
+AI 解讀模組 - 使用 OpenRouter API（免費模型）
 """
 
 import urllib.request
@@ -8,13 +8,13 @@ import json
 
 
 def call_ai(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
-    """呼叫 Groq API"""
+    """呼叫 OpenRouter API"""
     if not api_key:
-        raise ValueError("GROQ_API_KEY 未設定，請在 Railway Variables 中加入")
+        raise ValueError("OPENROUTER_API_KEY 未設定，請在 Railway Variables 中加入")
 
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    url = "https://openrouter.ai/api/v1/chat/completions"
     payload = json.dumps({
-        "model": "llama-3.3-70b-versatile",
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.8
@@ -25,7 +25,9 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": "https://telegram.org",
+            "X-Title": "Numerology Bot"
         },
         method="POST"
     )
@@ -70,18 +72,18 @@ def build_prompt(data: dict) -> str:
 內在命盤：天賦數{hidden.get('total','?')} 本命靈數{hidden.get('single','?')}（{h_meaning.get('name','')}）關鍵詞：{h_meaning.get('keyword','')}
 圈數：{dict(sorted(hidden.get('grid',{}).items()))} 強勢數：{hidden_strong_str} 空缺：{hidden_missing_str}
 
-綜合命盤：圈數{dict(sorted(combined_grid.items()))} 強勢數：{combined_strong_str} 空缺：{combined_missing_str}
+綜合命盤：強勢數：{combined_strong_str} 空缺：{combined_missing_str}
 
 請按三個部分撰寫，語氣溫暖直接，適時幽默，說到用戶心坎裡：
 
 一、外在性格解析（西曆命盤）
-涵蓋：天賦數{manifest['total']}的深層意義、本命靈數{manifest['single']}的外在性格與行為模式、興趣愛好傾向、空缺數{manifest_missing_str}的具體影響與補足方向。性格描述要全面真實。
+涵蓋：天賦數{manifest['total']}的深層意義、本命靈數{manifest['single']}的外在性格與行為模式、興趣愛好傾向、空缺數的具體影響與補足方向。
 
 二、內在精神解析（農曆命盤）
-涵蓋：天賦數{hidden.get('total','?')}的底層驅動力、本命靈數{hidden.get('single','?')}的內在特質與真實動機、強勢數的雙面影響、空缺數在關係與決策中的顯現。讓人感覺「你看穿了我」。
+涵蓋：天賦數{hidden.get('total','?')}的底層驅動力、本命靈數{hidden.get('single','?')}的內在特質與真實動機、強勢數的雙面影響、空缺數在關係與決策中的顯現。
 
 三、綜合命盤總結（最重要，篇幅最長）
-涵蓋：外在靈數{manifest['single']}與內在靈數{hidden.get('single','?')}的核心對話、完整性格描述、興趣愛好、強勢數主導影響、適合職業（融入文字）、感情模式與理想伴侶（融入文字）、常見瓶頸與解決方式、能量失衡的兩種狀態與解藥、最後一句有力量的話作結。
+涵蓋：外在靈數{manifest['single']}與內在靈數{hidden.get('single','?')}的核心對話、完整性格描述、興趣愛好、適合職業（融入文字）、感情模式（融入文字）、瓶頸與解法、能量失衡兩種狀態與解藥、最後一句有力量的話。
 
 格式：三個部分各有標題，段落間空行，流暢段落文字。"""
 
@@ -102,7 +104,7 @@ def get_year_detail(data: dict, api_key: str) -> str:
     monthly = data["monthly_current"]
     month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
     monthly_str = "、".join([f"{month_names[i]}月={pm['single']}" for i, pm in enumerate(monthly)])
-    personal_year_note = f"\n注意：這是本命年，流年數={birth_single}與生命靈數相同，能量特別強烈，請重點說明。" if is_personal_year else ""
+    personal_year_note = f"\n注意：這是本命年，流年數={birth_single}與生命靈數相同，請重點說明。" if is_personal_year else ""
 
     prompt = f"""你是生命靈數分析師，請用繁體中文做詳細流年分析，語氣溫暖直接具體。
 
