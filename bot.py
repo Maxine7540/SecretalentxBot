@@ -11,7 +11,7 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
 from numerology import full_analysis, NUMBER_MEANINGS, PERSONAL_YEAR_THEMES
-from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail
+from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail, get_outer_reading, get_inner_reading
 
 # ── 設定 ──────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -261,15 +261,16 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 顯示選單按鈕
     keyboard = [
+        [
+            InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
+            InlineKeyboardButton("🌙 內在精神", callback_data="inner"),
+        ],
         [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
         [
             InlineKeyboardButton("💼 適合職業", callback_data="career"),
             InlineKeyboardButton("💕 感情對象", callback_data="love"),
         ],
-        [
-            InlineKeyboardButton("📅 流年詳解", callback_data="year_detail"),
-            InlineKeyboardButton("📆 下一年流年", callback_data="next_year"),
-        ],
+        [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -293,7 +294,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     action = query.data
 
-    if action == "ai_full":
+    if action == "outer":
+        await query.edit_message_text("☀️ 正在分析外在性格，請稍候...")
+        try:
+            reading = get_outer_reading(data, "")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"☀️ 外在性格解析\n\n{reading}",
+            )
+        except Exception as e:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"⚠️ 分析出錯，請稍後再試。\n錯誤：{str(e)[:100]}"
+            )
+
+    elif action == "inner":
+        await query.edit_message_text("🌙 正在分析內在精神，請稍候...")
+        try:
+            reading = get_inner_reading(data, "")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"🌙 內在精神解析\n\n{reading}",
+            )
+        except Exception as e:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"⚠️ 分析出錯，請稍後再試。\n錯誤：{str(e)[:100]}"
+            )
+
+    elif action == "ai_full":
         await query.edit_message_text("🔮 正在進行綜合命盤分析，請稍候約 60 秒，請勿重複點擊...")
         try:
             reading = get_ai_reading(data, "")
@@ -334,22 +363,43 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
         )
 
-    elif action == "year_detail":
+    elif action == "year_menu":
+        current_year = data["personal_year_current"]["year"]
+        next_year = data["personal_year_next"]["year"]
+        py_current = data["personal_year_current"]
+        py_next = data["personal_year_next"]
+        keyboard = [[
+            InlineKeyboardButton(f"📅 {current_year}年（流年{py_current['single']}）", callback_data="year_current"),
+            InlineKeyboardButton(f"📆 {next_year}年（流年{py_next['single']}）", callback_data="year_next"),
+        ]]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="請選擇要分析哪一年的流年：",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
+
+    elif action == "year_current":
         py = data["personal_year_current"]
-        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年詳解，請稍候...")
-        detail = get_year_detail(data, "")
-        chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
-        for chunk in chunks:
-            try:
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=chunk,
-                )
-            except Exception:
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=chunk[:4000],
-                )
+        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年，請稍候...")
+        try:
+            detail = get_year_detail(data, "", year_type="current")
+            chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 分析出錯：{str(e)[:100]}")
+
+    elif action == "year_next":
+        py = data["personal_year_next"]
+        await query.edit_message_text(f"📆 正在分析 {py['year']} 年流年，請稍候...")
+        try:
+            detail = get_year_detail(data, "", year_type="next")
+            chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 分析出錯：{str(e)[:100]}")
 
     elif action == "month_menu":
         # 顯示12個月份按鈕
@@ -412,15 +462,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 重新顯示選單
     keyboard = [
+        [
+            InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
+            InlineKeyboardButton("🌙 內在精神", callback_data="inner"),
+        ],
         [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
         [
             InlineKeyboardButton("💼 適合職業", callback_data="career"),
             InlineKeyboardButton("💕 感情對象", callback_data="love"),
         ],
-        [
-            InlineKeyboardButton("📅 流年詳解", callback_data="year_detail"),
-            InlineKeyboardButton("📆 下一年流年", callback_data="next_year"),
-        ],
+        [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)

@@ -72,9 +72,9 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 1200) -> str:
 
     if openrouter_key:
         attempts += [
-            ("OpenRouter Gemini", lambda: call_openrouter(prompt, openrouter_key, "google/gemini-2.0-flash-exp:free", max_tokens)),
-            ("OpenRouter DeepSeek", lambda: call_openrouter(prompt, openrouter_key, "deepseek/deepseek-r1:free", max_tokens)),
-            ("OpenRouter Llama", lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.1-8b-instruct:free", max_tokens)),
+            ("OpenRouter Llama 3.3 70B", lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.3-70b-instruct:free", max_tokens)),
+            ("OpenRouter Mistral", lambda: call_openrouter(prompt, openrouter_key, "mistralai/mistral-7b-instruct:free", max_tokens)),
+            ("OpenRouter Qwen", lambda: call_openrouter(prompt, openrouter_key, "qwen/qwen-2-7b-instruct:free", max_tokens)),
         ]
 
     if gemini_key:
@@ -142,12 +142,16 @@ def get_ai_reading(data: dict, api_key: str) -> str:
     return call_ai(build_prompt(data), api_key, max_tokens=1200)
 
 
-def get_year_detail(data: dict, api_key: str) -> str:
-    py = data["personal_year_current"]
+def get_year_detail(data: dict, api_key: str, year_type: str = "current") -> str:
+    if year_type == "next":
+        py = data["personal_year_next"]
+        monthly = data["monthly_next"]
+    else:
+        py = data["personal_year_current"]
+        monthly = data["monthly_current"]
     solar = data["solar"]
     birth_single = data["manifest"]["single"]
     is_personal_year = (py["single"] == birth_single)
-    monthly = data["monthly_current"]
     month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
     monthly_str = "、".join([f"{month_names[i]}月={pm['single']}" for i, pm in enumerate(monthly)])
 
@@ -175,3 +179,57 @@ def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
 分析：整體能量、事業財運、感情人際、身心提醒、三大行動建議、幸運數字與顏色。"""
 
     return call_ai(prompt, api_key, max_tokens=600)
+
+
+def get_outer_reading(data: dict, api_key: str) -> str:
+    """外在性格解析（西曆命盤）"""
+    manifest = data["manifest"]
+    solar = data["solar"]
+    m_meaning = data.get("manifest_meaning", {})
+    strong_str = "、".join(f"{k}({v}圈)" for k, v in manifest["strong_numbers"].items()) if manifest["strong_numbers"] else "無"
+    missing_str = "、".join(str(n) for n in manifest["missing_numbers"]) if manifest["missing_numbers"] else "無"
+
+    prompt = f"""你是專業生命靈數分析師，請用繁體中文深入分析以下命主的外在性格，語氣溫暖直接，說到用戶心坎裡。
+
+西曆生日：{solar['year']}/{solar['month']:02d}/{solar['day']:02d}
+天賦數：{manifest['total']} 本命靈數：{manifest['single']}（{m_meaning.get('name','')}）
+關鍵詞：{m_meaning.get('keyword','')}
+圈數分佈：{dict(sorted(manifest['grid'].items()))}
+強勢數：{strong_str} 空缺數：{missing_str}
+
+請深入分析：
+1. 天賦數{manifest['total']}的深層意義與人生課題
+2. 本命靈數{manifest['single']}塑造的外在性格、行為模式、優勢與局限
+3. 此人的興趣愛好傾向（會被哪些領域吸引）
+4. 強勢數的影響（若有）
+5. 空缺數{missing_str}在日常生活與關係中的具體影響，以及補足方向
+語氣像在說一個真實的人，不要空泛。"""
+
+    return call_ai(prompt, api_key, max_tokens=1000)
+
+
+def get_inner_reading(data: dict, api_key: str) -> str:
+    """內在精神解析（農曆命盤）"""
+    hidden = data["hidden"]
+    solar = data["solar"]
+    lunar = data["lunar"]
+    h_meaning = data.get("hidden_meaning", {})
+    strong_str = "、".join(f"{k}({v}圈)" for k, v in hidden.get("strong_numbers", {}).items()) if hidden.get("strong_numbers") else "無"
+    missing_str = "、".join(str(n) for n in hidden.get("missing_numbers", [])) if hidden.get("missing_numbers") else "無"
+
+    prompt = f"""你是專業生命靈數分析師，請用繁體中文深入分析以下命主的內在精神，語氣溫暖直接，讓人感覺「你看穿了我」。
+
+農曆生日：{lunar.get('display','無')}（西曆{solar['year']}/{solar['month']:02d}/{solar['day']:02d}）
+天賦數：{hidden.get('total','?')} 本命靈數：{hidden.get('single','?')}（{h_meaning.get('name','')}）
+關鍵詞：{h_meaning.get('keyword','')}
+圈數分佈：{dict(sorted(hidden.get('grid',{}).items()))}
+強勢數：{strong_str} 空缺數：{missing_str}
+
+請深入分析：
+1. 天賦數{hidden.get('total','?')}的底層驅動力與價值觀
+2. 本命靈數{hidden.get('single','?')}的內在特質、真實動機、不常讓人看見的那一面
+3. 強勢數{strong_str}的雙面影響（最大資產與需要馴服的力量）
+4. 空缺數{missing_str}在關係、決策、情感模式中的具體顯現
+語氣要理解而非批判，讓人讀完說「這就是我」。"""
+
+    return call_ai(prompt, api_key, max_tokens=1000)
