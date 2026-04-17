@@ -93,11 +93,14 @@ def format_combined_chart(data: dict) -> str:
 
 def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) -> str:
     is_personal_year = (py["single"] == birth_single)
-    text = f"📆 *{year}年流年數：{py['total']}（個位 {py['single']}）*\n"
+    all_digits = py.get("all_digits", "")
+    calc_str = "+".join(all_digits) + f" = {py.get('raw_sum', '')} → {py['single']}" if all_digits else ""
+    text = f"📆 *{year}年流年*\n"
+    text += f"{calc_str}\n"
+    text += f"流年數 *{py['single']}*　{PERSONAL_YEAR_THEMES.get(py['single'], '')}\n"
     if is_personal_year:
-        text += "⭐ 本命年！能量特別強烈，點「流年詳解」了解更多\n"
-    text += f"主題：{PERSONAL_YEAR_THEMES.get(py['single'], '')}\n\n"
-    text += "💡 點下方按鈕可查看流年詳解或各月流月分析"
+        text += "⭐ 本命年！能量特別強烈\n"
+    text += "\n💡 點下方按鈕查看流年詳解或各月流月分析"
     return text
 
 
@@ -209,7 +212,7 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 顯示選單按鈕
     keyboard = [
-        [InlineKeyboardButton("🤖 AI深度解讀（完整分析）", callback_data="ai_full")],
+        [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
         [
             InlineKeyboardButton("💼 適合職業", callback_data="career"),
             InlineKeyboardButton("💕 感情對象", callback_data="love"),
@@ -242,14 +245,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = query.data
 
     if action == "ai_full":
-        await query.edit_message_text("🤖 AI 正在深度解讀你的命盤，這需要約 30 秒...")
+        await query.edit_message_text("🔮 正在進行綜合命盤分析，這需要約 30 秒...")
         reading = get_ai_reading(data, CLAUDE_API_KEY)
         chunks = [reading[i:i+3500] for i in range(0, len(reading), 3500)]
         for i, chunk in enumerate(chunks):
             if i == 0:
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=f"🌟 *AI 命盤深度解讀*\n\n{chunk}",
+                    text=f"🔮 *綜合命盤分析*\n\n{chunk}",
                     parse_mode="Markdown"
                 )
             else:
@@ -351,7 +354,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 重新顯示選單
     keyboard = [
-        [InlineKeyboardButton("🤖 AI深度解讀（完整分析）", callback_data="ai_full")],
+        [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
         [
             InlineKeyboardButton("💼 適合職業", callback_data="career"),
             InlineKeyboardButton("💕 感情對象", callback_data="love"),

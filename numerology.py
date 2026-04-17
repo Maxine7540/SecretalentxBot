@@ -70,8 +70,8 @@ def calc_manifest_chart(year: int, month: int, day: int) -> dict:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
-    # 找出圈數 ≥ 5 的數字（強勢數）
-    strong = {k: v for k, v in grid.items() if v >= 5}
+    # 找出圈數 ≥ 3 的數字（強勢數，單盤標準）
+    strong = {k: v for k, v in grid.items() if v >= 3}
     # 空缺數（1-9 中未出現的）
     missing = [i for i in range(1, 10) if i not in grid]
 
@@ -107,7 +107,7 @@ def calc_hidden_chart(lunar: dict) -> dict:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
-    strong = {k: v for k, v in grid.items() if v >= 5}
+    strong = {k: v for k, v in grid.items() if v >= 3}
     missing = [i for i in range(1, 10) if i not in grid]
 
     return {
@@ -126,10 +126,11 @@ def calc_hidden_chart(lunar: dict) -> dict:
 # 流年流月
 # ───────────────────────────────────────────────
 def calc_personal_year(birth_month: int, birth_day: int, target_year: int) -> dict:
-    """計算流年數"""
-    raw = birth_month + birth_day + target_year
-    total, single = reduce_to_single(sum(int(d) for d in str(raw)))
-    return {"year": target_year, "total": total, "single": single}
+    """計算流年數：年份所有數字 + 月 + 日"""
+    all_digits = f"{target_year}{birth_month:02d}{birth_day:02d}"
+    raw_sum = sum(int(d) for d in all_digits)
+    total, single = reduce_to_single(raw_sum)
+    return {"year": target_year, "total": total, "single": single, "raw_sum": raw_sum, "all_digits": all_digits}
 
 
 def calc_personal_month(personal_year_single: int, target_month: int) -> dict:
