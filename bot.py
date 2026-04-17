@@ -5,7 +5,7 @@
 import os
 import logging
 from datetime import date
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
@@ -27,66 +27,116 @@ ASK_DATE, ASK_TIME, SHOW_MENU = range(3)
 user_data_store = {}
 
 
-# ── 訊息格式化工具 ────────────────────────────
-def format_grid(grid: dict) -> str:
-    """格式化命盤圈數，清晰列表顯示"""
+# emoji 數字對照
+NUM_EMOJI = {1:"1️⃣",2:"2️⃣",3:"3️⃣",4:"4️⃣",5:"5️⃣",6:"6️⃣",7:"7️⃣",8:"8️⃣",9:"9️⃣"}
+
+
+def format_grid(grid: dict, color: str = "purple") -> str:
+    """格式化命盤圈數：emoji數字 + 圓點"""
+    dot = "🟣" if color == "purple" else ("🟡" if color == "gold" else "🟢")
     lines = []
     for n in range(1, 10):
         count = grid.get(n, 0)
+        emoji = NUM_EMOJI[n]
         if count == 0:
-            lines.append(f"  {n}  空缺")
+            lines.append(f"{emoji}  空缺")
         else:
-            circles = "●" * count
-            lines.append(f"  {n}  {circles} {count}圈")
+            lines.append(f"{emoji}  {dot * count}")
     return "\n".join(lines)
 
 
 def format_combined_chart(data: dict) -> str:
-    """將顯性命盤與隱性命盤合併成一個完整訊息"""
+    """將外在性格命盤、內在精神命盤、綜合命盤合併成一個完整訊息"""
     manifest = data["manifest"]
     hidden = data["hidden"]
     m_meaning = data.get("manifest_meaning", {})
     h_meaning = data.get("hidden_meaning", {})
+    solar = data["solar"]
 
-    # ── 標題 ──
-    text = "🌟 *完整命盤總覽*\n"
-    text += "━━━━━━━━━━━━━━━\n\n"
+    # 加總過程字串（西曆）
+    digits_str = "+".join(manifest["all_digits"])
+    calc_m = f"{digits_str} = {manifest['raw_sum']}"
+    if manifest['raw_sum'] != manifest['total']:
+        calc_m += f" → {manifest['total']}"
+    calc_m += f" → 個位 *{manifest['single']}*"
 
-    # ── 顯性命盤 ──
-    text += "☀️ *顯性命盤（西曆）*\n"
-    text += f"📅 {manifest['date_str']}\n"
-    text += f"加總：{manifest['all_digits']} → {manifest['raw_sum']} → *{manifest['total']}* → 個位 *{manifest['single']}*\n"
-    text += f"命數：*{manifest['total']}（{manifest['single']}）{m_meaning.get('name', '')}*\n"
-    text += f"關鍵詞：{m_meaning.get('keyword', '')}\n\n"
-    text += "圈數分佈：\n```\n" + format_grid(manifest["grid"]) + "\n```"
+    text = "✨ *靈數命盤*\n\n"
+
+    # ── 外在性格命盤（西曆）──
+    text += f"☀️ *西曆生日*\n"
+    text += f"{solar['year']} / {solar['month']:02d} / {solar['day']:02d}\n"
+    text += f"`{calc_m}`\n"
+    text += f"天賦數 *{manifest['total']}*　本命靈數 *{manifest['single']}*\n"
+    text += f"{m_meaning.get('name', '')} — {m_meaning.get('keyword', '')}\n\n"
+    text += "*外在性格命盤*\n"
+    text += format_grid(manifest["grid"], "purple") + "\n\n"
     if manifest["strong_numbers"]:
         nums = "、".join([f"{k}（{v}圈）" for k, v in manifest["strong_numbers"].items()])
-        text += f"\n⚡ 強勢數：{nums}"
+        text += f"⚡ 強勢數：{nums}\n"
+    else:
+        text += "⚡ 強勢數：無\n"
     if manifest["missing_numbers"]:
         nums = "、".join(str(n) for n in manifest["missing_numbers"])
-        text += f"\n🕳 空缺數：{nums}"
-
-    text += "\n\n━━━━━━━━━━━━━━━\n\n"
-
-    # ── 隱性命盤 ──
-    if "error" in hidden:
-        text += f"🌙 *隱性命盤（農曆）*\n⚠️ 農曆轉換失敗：{hidden['error']}\n"
+        text += f"🕳 空缺數：{nums}\n"
     else:
-        text += "🌙 *隱性命盤（農曆）*\n"
-        text += f"📅 {hidden['date_str']}\n"
-        text += f"加總：{hidden['all_digits']} → {hidden['raw_sum']} → *{hidden['total']}* → 個位 *{hidden['single']}*\n"
-        text += f"命數：*{hidden['total']}（{hidden['single']}）{h_meaning.get('name', '')}*\n"
-        text += f"關鍵詞：{h_meaning.get('keyword', '')}\n\n"
-        text += "圈數分佈：\n```\n" + format_grid(hidden["grid"]) + "\n```"
+        text += "🕳 空缺數：無\n"
+
+    text += "\n━━━━━━━━━━━━━━━\n\n"
+
+    # ── 內在精神命盤（農曆）──
+    if "error" in hidden:
+        text += f"🌙 *農曆生日*\n⚠️ 農曆轉換失敗：{hidden['error']}\n"
+    else:
+        lunar = data["lunar"]
+        digits_str_h = "+".join(hidden["all_digits"])
+        calc_h = f"{digits_str_h} = {hidden['raw_sum']}"
+        if hidden['raw_sum'] != hidden['total']:
+            calc_h += f" → {hidden['total']}"
+        calc_h += f" → 個位 *{hidden['single']}*"
+
+        text += f"🌙 *農曆生日*\n"
+        text += f"{lunar['year']} / {lunar['month']:02d} / {lunar['day']:02d}（{lunar.get('zodiac','')}年）\n"
+        text += f"`{calc_h}`\n"
+        text += f"天賦數 *{hidden['total']}*　本命靈數 *{hidden['single']}*\n"
+        text += f"{h_meaning.get('name', '')} — {h_meaning.get('keyword', '')}\n\n"
+        text += "*內在精神命盤*\n"
+        text += format_grid(hidden["grid"], "gold") + "\n\n"
         if hidden["strong_numbers"]:
             nums = "、".join([f"{k}（{v}圈）" for k, v in hidden["strong_numbers"].items()])
-            text += f"\n⚡ 強勢數：{nums}"
+            text += f"⚡ 強勢數：{nums}\n"
+        else:
+            text += "⚡ 強勢數：無\n"
         if hidden["missing_numbers"]:
             nums = "、".join(str(n) for n in hidden["missing_numbers"])
-            text += f"\n🕳 空缺數：{nums}"
+            text += f"🕳 空缺數：{nums}\n"
+        else:
+            text += "🕳 空缺數：無\n"
 
-    text += "\n\n━━━━━━━━━━━━━━━\n"
-    text += "💡 點「AI深度解讀」獲得顯性＋隱性命盤的綜合分析"
+    text += "\n━━━━━━━━━━━━━━━\n\n"
+
+    # ── 綜合命盤 ──
+    combined_grid = {}
+    for n in range(1, 10):
+        combined_grid[n] = manifest["grid"].get(n, 0) + (hidden.get("grid", {}).get(n, 0) if "error" not in hidden else 0)
+    combined_strong = {k: v for k, v in combined_grid.items() if v >= 5}
+    # 若無 ≥5 圈，取最多圈的數（需 ≥1）
+    if not combined_strong:
+        max_val = max(combined_grid.values())
+        if max_val >= 1:
+            combined_strong_display = "、".join([f"{k}（{v}圈）" for k, v in combined_grid.items() if v == max_val])
+        else:
+            combined_strong_display = "無"
+    else:
+        combined_strong_display = "、".join([f"{k}（{v}圈）" for k, v in combined_strong.items()])
+    combined_missing = [n for n in range(1, 10) if combined_grid.get(n, 0) == 0]
+
+    text += "*綜合命盤圈數分佈*\n"
+    text += format_grid(combined_grid, "teal") + "\n\n"
+    text += f"⚡ 強勢數：{combined_strong_display}\n"
+    if combined_missing:
+        text += f"🕳 空缺數：{'、'.join(str(n) for n in combined_missing)}\n"
+    else:
+        text += "🕳 空缺數：無\n"
 
     return text
 
@@ -94,10 +144,20 @@ def format_combined_chart(data: dict) -> str:
 def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) -> str:
     is_personal_year = (py["single"] == birth_single)
     all_digits = py.get("all_digits", "")
-    calc_str = "+".join(all_digits) + f" = {py.get('raw_sum', '')} → {py['single']}" if all_digits else ""
+    digits_str = "+".join(all_digits) if all_digits else ""
+    raw = py.get("raw_sum", "")
+    single = py["single"]
+
+    # 計算過程：例如 2+0+2+6+0+8+1+6 = 25 → 2+5 = 7
+    if raw > 9:
+        second_step = "+".join(str(d) for d in str(raw))
+        calc_str = f"`{digits_str} = {raw} → {second_step} = {single}`"
+    else:
+        calc_str = f"`{digits_str} = {single}`"
+
     text = f"📆 *{year}年流年*\n"
     text += f"{calc_str}\n"
-    text += f"流年數 *{py['single']}*　{PERSONAL_YEAR_THEMES.get(py['single'], '')}\n"
+    text += f"流年數 *{single}*　{PERSONAL_YEAR_THEMES.get(single, '')}\n"
     if is_personal_year:
         text += "⭐ 本命年！能量特別強烈\n"
     text += "\n💡 點下方按鈕查看流年詳解或各月流月分析"
@@ -106,18 +166,22 @@ def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) ->
 
 # ── 指令處理 ──────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[
+        KeyboardButton("/start"),
+        KeyboardButton("/analyze"),
+    ]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
-        "🔢 *歡迎來到生命靈數分析 Bot！*\n\n"
+        "✨ *歡迎來到生命靈數 Bot！*\n\n"
         "我可以為你計算：\n"
-        "✅ 顯性命盤（西曆）\n"
-        "✅ 隱性命盤（農曆）\n"
-        "✅ 命盤強勢數與空缺數分析\n"
-        "✅ 適合職業與感情對象\n"
-        "✅ 流年流月詳細分析\n\n"
-        "請輸入指令開始：\n"
-        "👉 /analyze — 開始分析\n"
-        "👉 /help — 查看說明",
-        parse_mode="Markdown"
+        "☀️ 外在性格命盤（西曆）\n"
+        "🌙 內在精神命盤（農曆）\n"
+        "🟢 綜合命盤圈數分析\n"
+        "🔮 AI 綜合命盤深度解析\n"
+        "📅 流年流月詳細分析\n\n"
+        "點下方按鈕開始 👇",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
 
 

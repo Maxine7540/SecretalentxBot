@@ -57,27 +57,34 @@ def solar_to_lunar(year: int, month: int, day: int) -> dict:
 # ───────────────────────────────────────────────
 def calc_manifest_chart(year: int, month: int, day: int) -> dict:
     """
-    顯性命盤：用西曆生日計算
-    將 YYYY + MM + DD 所有數字相加
+    外在性格命盤：用西曆生日計算
+    將 YYYY + MM + DD 所有數字相加，本命靈數額外加一圈
     """
     all_digits = f"{year}{month:02d}{day:02d}"
     raw_sum = sum(int(d) for d in all_digits)
     total, single = reduce_to_single(raw_sum)
 
-    # 命盤九宮格（記錄每個數字出現次數）
+    # 命盤圈數（記錄每個數字出現次數，0不計）
     grid = {}
     for d in all_digits:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
-    # 找出圈數 ≥ 3 的數字（強勢數，單盤標準）
+    # 本命靈數額外加一圈
+    grid[single] = grid.get(single, 0) + 1
+
+    # 強勢數（單盤 ≥3 圈）
     strong = {k: v for k, v in grid.items() if v >= 3}
     # 空缺數（1-9 中未出現的）
     missing = [i for i in range(1, 10) if i not in grid]
 
+    # 計算過程字串
+    digits_display = "+".join(all_digits)
+
     return {
         "date_str": f"{year}/{month:02d}/{day:02d}",
         "all_digits": all_digits,
+        "digits_display": digits_display,
         "raw_sum": raw_sum,
         "total": total,
         "single": single,
@@ -88,9 +95,7 @@ def calc_manifest_chart(year: int, month: int, day: int) -> dict:
 
 
 def calc_hidden_chart(lunar: dict) -> dict:
-    """
-    隱性命盤：用農曆生日計算
-    """
+    """內在精神命盤：用農曆生日計算，本命靈數額外加一圈"""
     if "error" in lunar:
         return {"error": lunar["error"]}
 
@@ -107,12 +112,18 @@ def calc_hidden_chart(lunar: dict) -> dict:
         if d != '0':
             grid[int(d)] = grid.get(int(d), 0) + 1
 
+    # 本命靈數額外加一圈
+    grid[single] = grid.get(single, 0) + 1
+
     strong = {k: v for k, v in grid.items() if v >= 3}
     missing = [i for i in range(1, 10) if i not in grid]
+
+    digits_display = "+".join(all_digits)
 
     return {
         "date_str": lunar["display"],
         "all_digits": all_digits,
+        "digits_display": digits_display,
         "raw_sum": raw_sum,
         "total": total,
         "single": single,
