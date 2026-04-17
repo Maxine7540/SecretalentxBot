@@ -1,9 +1,29 @@
 """
 AI 解讀模組
-使用 Claude API 根據命盤數據生成深度分析
+使用 Google Gemini API（免費方案）根據命盤數據生成深度分析
 """
 
-import anthropic
+import os
+import urllib.request
+import urllib.error
+import json
+
+
+def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
+    """呼叫 Google Gemini API"""
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read().decode("utf-8"))
+    return result["candidates"][0]["content"]["parts"][0]["text"]
 
 
 def build_prompt(data: dict) -> str:
@@ -105,22 +125,13 @@ def build_prompt(data: dict) -> str:
 
 
 def get_ai_reading(data: dict, api_key: str) -> str:
-    """呼叫 Claude API 生成綜合命盤解讀"""
-    if not api_key:
-        raise ValueError("CLAUDE_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
-    client = anthropic.Anthropic(api_key=api_key)
+    """呼叫 Gemini API 生成綜合命盤解讀"""
     prompt = build_prompt(data)
-    message = client.messages.create(
-        model="claude-opus-4-5-20251101",
-        max_tokens=3500,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return message.content[0].text
+    return call_gemini(prompt, api_key, max_tokens=3500)
 
 
 def get_year_detail(data: dict, api_key: str) -> str:
-    """流年詳細分析，包含本命年說明"""
-    client = anthropic.Anthropic(api_key=api_key)
+    """流年詳細分析"""
     py = data["personal_year_current"]
     solar = data["solar"]
     birth_single = data["manifest"]["single"]
@@ -166,20 +177,11 @@ def get_year_detail(data: dict, api_key: str) -> str:
 **今年送給自己的一句話**
 一句真正說到這個流年核心的話，有力量，不陳腔濫調"""
 
-    try:
-        message = client.messages.create(
-            model="claude-opus-4-5-20251101",
-            max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return message.content[0].text
-    except Exception as e:
-        return f"流年分析暫時無法使用：{str(e)}"
+    return call_gemini(prompt, api_key, max_tokens=1500)
 
 
 def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
     """單月詳細流月分析"""
-    client = anthropic.Anthropic(api_key=api_key)
     py = data["personal_year_current"]
     monthly = data["monthly_current"]
     pm = monthly[month - 1]
@@ -213,12 +215,4 @@ def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
 **幸運提示**
 本月幸運數字與建議顏色"""
 
-    try:
-        message = client.messages.create(
-            model="claude-opus-4-5-20251101",
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return message.content[0].text
-    except Exception as e:
-        return f"流月分析暫時無法使用：{str(e)}"
+    return call_gemini(prompt, api_key, max_tokens=800)
