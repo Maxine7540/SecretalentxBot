@@ -72,9 +72,11 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 1200) -> str:
 
     if openrouter_key:
         attempts += [
-            ("OpenRouter Llama 3.3 70B", lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.3-70b-instruct:free", max_tokens)),
-            ("OpenRouter Mistral", lambda: call_openrouter(prompt, openrouter_key, "mistralai/mistral-7b-instruct:free", max_tokens)),
-            ("OpenRouter Qwen", lambda: call_openrouter(prompt, openrouter_key, "qwen/qwen-2-7b-instruct:free", max_tokens)),
+            ("OR DeepSeek V3",   lambda: call_openrouter(prompt, openrouter_key, "deepseek/deepseek-chat-v3-0324:free", max_tokens)),
+            ("OR Llama 3.1 8B",  lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.1-8b-instruct:free", max_tokens)),
+            ("OR Gemma 3 4B",    lambda: call_openrouter(prompt, openrouter_key, "google/gemma-3-4b-it:free", max_tokens)),
+            ("OR Llama 3.3 70B", lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.3-70b-instruct:free", max_tokens)),
+            ("OR Mistral 7B",    lambda: call_openrouter(prompt, openrouter_key, "mistralai/mistral-7b-instruct:free", max_tokens)),
         ]
 
     if gemini_key:
@@ -98,6 +100,7 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 1200) -> str:
 
 
 def build_prompt(data: dict) -> str:
+    """綜合命盤分析 prompt（只寫第三部分：外在＋內在融合）"""
     manifest = data["manifest"]
     hidden = data["hidden"]
     solar = data["solar"]
@@ -110,36 +113,34 @@ def build_prompt(data: dict) -> str:
     combined_strong = {k: v for k, v in combined_grid.items() if v >= 5}
     combined_missing = [n for n in range(1, 10) if combined_grid.get(n, 0) == 0]
 
-    manifest_strong_str = "、".join(f"{k}({v}圈)" for k, v in manifest["strong_numbers"].items()) if manifest["strong_numbers"] else "無"
-    manifest_missing_str = "、".join(str(n) for n in manifest["missing_numbers"]) if manifest["missing_numbers"] else "無"
-    hidden_strong_str = "、".join(f"{k}({v}圈)" for k, v in hidden.get("strong_numbers", {}).items()) if hidden.get("strong_numbers") else "無"
-    hidden_missing_str = "、".join(str(n) for n in hidden.get("missing_numbers", [])) if hidden.get("missing_numbers") else "無"
     combined_strong_str = "、".join(f"{k}({v}圈)" for k, v in combined_strong.items()) if combined_strong else "無"
     combined_missing_str = "、".join(str(n) for n in combined_missing) if combined_missing else "無"
 
-    prompt = f"""你是專業生命靈數分析師，請用繁體中文撰寫深入個人化的綜合命盤分析。
+    prompt = f"""你是專業生命靈數分析師，請用繁體中文撰寫外在＋內在的融合分析。語氣溫暖直接，適時幽默，說到用戶心坎裡。
 
-西曆：{solar['year']}/{solar['month']:02d}/{solar['day']:02d} 農曆：{data['lunar'].get('display','無')}
-外在命盤：天賦數{manifest['total']} 本命靈數{manifest['single']}（{m_meaning.get('name','')}）{m_meaning.get('keyword','')} 強勢：{manifest_strong_str} 空缺：{manifest_missing_str}
-內在命盤：天賦數{hidden.get('total','?')} 本命靈數{hidden.get('single','?')}（{h_meaning.get('name','')}）{h_meaning.get('keyword','')} 強勢：{hidden_strong_str} 空缺：{hidden_missing_str}
-綜合命盤：強勢{combined_strong_str} 空缺{combined_missing_str}
+西曆：{solar['year']}/{solar['month']:02d}/{solar['day']:02d}
+農曆：{data['lunar'].get('display','無')}
+外在本命靈數：{manifest['single']}（{m_meaning.get('name','')}）天賦數{manifest['total']}
+內在本命靈數：{hidden.get('single','?')}（{h_meaning.get('name','')}）天賦數{hidden.get('total','?')}
+綜合強勢數：{combined_strong_str}　綜合空缺數：{combined_missing_str}
 
-請分三部分撰寫，語氣溫暖直接，說到用戶心坎裡：
+請寫「綜合命盤分析」，涵蓋：
+- 外在靈數{manifest['single']}與內在靈數{hidden.get('single','?')}的核心對話（互補、共鳴或張力）
+- 這個組合的完整性格描述（思維、行事、人際）
+- 興趣愛好傾向
+- 適合的職業方向（自然融入，不加標題）
+- 感情模式與理想伴侶（自然融入，不加標題）
+- 常見瓶頸與解決方式
+- 能量失衡的兩種狀態與解藥
+- 最後一句有力量的話
 
-一、外在性格解析
-天賦數{manifest['total']}的意義、本命靈數{manifest['single']}的外在性格與興趣愛好、空缺數影響。
-
-二、內在精神解析
-天賦數{hidden.get('total','?')}的底層驅動力、本命靈數{hidden.get('single','?')}的內在特質、強勢數雙面影響、空缺數影響。
-
-三、綜合總結（最重要最長）
-外在{manifest['single']}與內在{hidden.get('single','?')}的對話、完整性格、職業方向（融入文字）、感情模式（融入文字）、瓶頸與解法、能量失衡兩種狀態、最後一句有力量的話。"""
+用流暢的段落文字，不要條列。"""
 
     return prompt
 
 
 def get_ai_reading(data: dict, api_key: str) -> str:
-    return call_ai(build_prompt(data), api_key, max_tokens=1200)
+    return call_ai(build_prompt(data), api_key, max_tokens=1500)
 
 
 def get_year_detail(data: dict, api_key: str, year_type: str = "current") -> str:
