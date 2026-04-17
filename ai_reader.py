@@ -14,7 +14,7 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY 未設定")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}
@@ -37,7 +37,7 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
                 wait = 20 * (attempt + 1)
                 time.sleep(wait)
                 continue
-            raise Exception(f"API 錯誤 {e.code}: {body[:200]}")
+            raise Exception(f"API 錯誤 {e.code}: {body[:500]}")
     raise Exception("請求次數過多，請稍候 2 分鐘後再試")
 
 
