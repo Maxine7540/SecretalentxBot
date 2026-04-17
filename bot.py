@@ -306,7 +306,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = query.data
 
     if action == "ai_full":
-        await query.edit_message_text("🔮 正在進行綜合命盤分析，這需要約 30 秒...")
+        await query.edit_message_text("🔮 正在進行綜合命盤分析，請稍候約 60 秒，請勿重複點擊...")
         try:
             reading = get_ai_reading(data, GEMINI_API_KEY)
             chunks = [reading[i:i+4000] for i in range(0, len(reading), 4000)]

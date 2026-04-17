@@ -15,7 +15,7 @@ def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}"
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}
@@ -30,11 +30,11 @@ def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
             return result["candidates"][0]["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                wait = 15 * (attempt + 1)
+                wait = 30 * (attempt + 1)
                 time.sleep(wait)
                 continue
             raise
-    raise Exception("請求次數過多，請稍候 1 分鐘後再試")
+    raise Exception("請求次數過多，請稍候 2 分鐘後再試")
 
 
 def build_prompt(data: dict) -> str:
