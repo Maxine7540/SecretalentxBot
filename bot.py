@@ -23,8 +23,8 @@ CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
 # 對話狀態
 ASK_DATE, ASK_TIME, SHOW_MENU = range(3)
 
-# 暫存用戶數據
-user_data_store = {}
+# 暫存用戶數據（使用 context.user_data，跟隨 Telegram session）
+# user_data_store 已棄用，改用 context.user_data
 
 
 # emoji 數字對照
@@ -219,7 +219,9 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ASK_DATE
 
     user_id = update.effective_user.id
-    user_data_store[user_id] = {"year": year, "month": month, "day": day}
+    context.user_data["year"] = year
+    context.user_data["month"] = month
+    context.user_data["day"] = day
 
     await update.message.reply_text(
         "🕐 請輸入你的*出生時辰*（24小時制，例如：14 代表下午2點）\n\n"
@@ -232,7 +234,7 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
-    stored = user_data_store.get(user_id, {})
+    stored = context.user_data
 
     birth_hour = None
     if text not in ["略過", "skip", "無", "不知道"]:
@@ -243,8 +245,7 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ 時間格式不正確，請輸入 0-23 之間的數字，或輸入「略過」")
             return ASK_TIME
 
-    stored["hour"] = birth_hour
-    user_data_store[user_id] = stored
+    context.user_data["hour"] = birth_hour
 
     # 計算命盤
     await update.message.reply_text("⏳ 正在計算你的命盤，請稍候...")
@@ -253,7 +254,7 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = full_analysis(
             stored["year"], stored["month"], stored["day"], birth_hour
         )
-        user_data_store[user_id]["analysis"] = data
+        context.user_data["analysis"] = data
     except Exception as e:
         await update.message.reply_text(f"⚠️ 計算出現問題：{e}")
         return ConversationHandler.END
@@ -295,7 +296,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    stored = user_data_store.get(user_id, {})
+    stored = context.user_data
     data = stored.get("analysis")
 
     if not data:
@@ -306,21 +307,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "ai_full":
         await query.edit_message_text("🔮 正在進行綜合命盤分析，這需要約 30 秒...")
-        reading = get_ai_reading(data, CLAUDE_API_KEY)
-        chunks = [reading[i:i+3500] for i in range(0, len(reading), 3500)]
-        for i, chunk in enumerate(chunks):
-            if i == 0:
+        try:
+            reading = get_ai_reading(data, CLAUDE_API_KEY)
+            chunks = [reading[i:i+4000] for i in range(0, len(reading), 4000)]
+            for i, chunk in enumerate(chunks):
+                header = "🔮 綜合命盤分析\n\n" if i == 0 else ""
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=f"🔮 *綜合命盤分析*\n\n{chunk}",
-                    parse_mode="Markdown"
+                    text=f"{header}{chunk}",
                 )
-            else:
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=chunk,
-                    parse_mode="Markdown"
-                )
+        except Exception as e:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"⚠️ 分析出錯，錯誤訊息：\n{str(e)}\n\nAPI Key 前5碼：{CLAUDE_API_KEY[:5] if CLAUDE_API_KEY else '未設定'}"
+            )
 
     elif action == "career":
         careers = data.get("careers", [])
@@ -350,13 +350,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         py = data["personal_year_current"]
         await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年詳解，請稍候...")
         detail = get_year_detail(data, CLAUDE_API_KEY)
-        chunks = [detail[i:i+3500] for i in range(0, len(detail), 3500)]
+        chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
         for chunk in chunks:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=chunk,
-                parse_mode="Markdown"
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=chunk,
+                )
+            except Exception:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=chunk[:4000],
+                )
 
     elif action == "month_menu":
         # 顯示12個月份按鈕
@@ -388,11 +393,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         year = data["personal_year_current"]["year"]
         await query.edit_message_text(f"📅 正在分析 {year} 年 {target_month} 月的流月，請稍候約15秒...")
         detail = get_monthly_detail(data, target_month, CLAUDE_API_KEY)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"🗓 *{year}年{target_month}月流月分析*\n\n{detail}",
-            parse_mode="Markdown"
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"🗓 {year}年{target_month}月流月分析\n\n{detail}",
+            )
+        except Exception:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=detail[:4000],
+            )
 
     elif action == "next_year":
         next_py = data["personal_year_next"]

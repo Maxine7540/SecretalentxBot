@@ -106,18 +106,16 @@ def build_prompt(data: dict) -> str:
 
 def get_ai_reading(data: dict, api_key: str) -> str:
     """呼叫 Claude API 生成綜合命盤解讀"""
+    if not api_key:
+        raise ValueError("CLAUDE_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
     client = anthropic.Anthropic(api_key=api_key)
     prompt = build_prompt(data)
-
-    try:
-        message = client.messages.create(
-            model="claude-opus-4-5-20251101",
-            max_tokens=3500,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return message.content[0].text
-    except Exception as e:
-        return f"AI 解讀暫時無法使用：{str(e)}\n\n請稍後再試，或聯絡管理員。"
+    message = client.messages.create(
+        model="claude-opus-4-5-20251101",
+        max_tokens=3500,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return message.content[0].text
 
 
 def get_year_detail(data: dict, api_key: str) -> str:
