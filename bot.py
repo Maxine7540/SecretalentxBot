@@ -261,15 +261,7 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 顯示選單按鈕
     keyboard = [
-        [
-            InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
-            InlineKeyboardButton("🌙 內在精神", callback_data="inner"),
-        ],
-        [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
-        [
-            InlineKeyboardButton("💼 適合職業", callback_data="career"),
-            InlineKeyboardButton("💕 感情對象", callback_data="love"),
-        ],
+        [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
         [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
@@ -294,7 +286,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     action = query.data
 
-    if action == "outer":
+    if action == "chart_menu":
+        keyboard = [
+            [InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
+             InlineKeyboardButton("🌙 內在精神", callback_data="inner")],
+            [InlineKeyboardButton("🔮 綜合分析", callback_data="ai_full")],
+            [InlineKeyboardButton("💼 適合職業", callback_data="career"),
+             InlineKeyboardButton("💕 感情對象", callback_data="love")],
+        ]
+        await query.edit_message_text(
+            "請選擇命盤分析項目：",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
+
+    elif action == "outer":
         await query.edit_message_text("☀️ 正在分析外在性格，請稍候...")
         try:
             reading = get_outer_reading(data, "")
@@ -462,15 +468,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 重新顯示選單
     keyboard = [
-        [
-            InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
-            InlineKeyboardButton("🌙 內在精神", callback_data="inner"),
-        ],
-        [InlineKeyboardButton("🔮 綜合命盤分析", callback_data="ai_full")],
-        [
-            InlineKeyboardButton("💼 適合職業", callback_data="career"),
-            InlineKeyboardButton("💕 感情對象", callback_data="love"),
-        ],
+        [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
         [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
     ]
