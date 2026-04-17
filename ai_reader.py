@@ -31,7 +31,14 @@ def call_openrouter(prompt: str, api_key: str, model: str, max_tokens: int) -> s
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
         result = json.loads(resp.read().decode("utf-8"))
-    return result["choices"][0]["message"]["content"]
+
+    choices = result.get("choices", [])
+    if not choices:
+        raise Exception(f"回傳 choices 為空: {str(result)[:150]}")
+    content = choices[0].get("message", {}).get("content", "")
+    if not content or len(content.strip()) < 10:
+        raise Exception("回傳內容為空或過短")
+    return content
 
 
 def call_gemini(prompt: str, api_key: str, max_tokens: int) -> str:
@@ -52,46 +59,54 @@ def call_gemini(prompt: str, api_key: str, max_tokens: int) -> str:
     return result["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def call_ai(prompt: str, api_key: str, max_tokens: int = 1200) -> str:
-    """
-    多 API 自動輪換：
-    1. OpenRouter Gemini 2.0 Flash（免費）
-    2. OpenRouter DeepSeek（免費）
-    3. OpenRouter Llama（免費）
-    4. Gemini 直接 API（備用）
-    """
-    # api_key 格式：openrouter key 或 gemini key
-    # 優先嘗試 OpenRouter（用 OPENROUTER_API_KEY）
+def call_openrouter_safe(prompt: str, api_key: str, model: str, max_tokens: int) -> str:
+    """帶完整錯誤處理的 OpenRouter 呼叫"""
+    try:
+        result = call_openrouter(prompt, api_key, model, max_tokens)
+        if not result or len(result.strip()) < 10:
+            raise Exception("回傳內容為空")
+        return result
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8") if hasattr(e, "read") else ""
+        raise Exception(f"HTTP {e.code}: {body[:150]}")
+
+
+def call_ai(prompt: str, api_key: str, max_tokens: int = 1500) -> str:
+    """多 API 自動輪換，失敗立刻跳下一個"""
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
-    errors = []
+    # 用預設參數固定變數，避免 lambda 捕獲問題
+    def make_or(model, mt=max_tokens, key=None):
+        k = key or openrouter_key
+        return lambda: call_openrouter_safe(prompt, k, model, mt)
 
-    # 嘗試順序
+    def make_gemini(mt=max_tokens, key=None):
+        k = key or gemini_key
+        return lambda: call_gemini(prompt, k, mt)
+
     attempts = []
-
     if openrouter_key:
         attempts += [
-            ("OR DeepSeek V3",   lambda: call_openrouter(prompt, openrouter_key, "deepseek/deepseek-chat-v3-0324:free", max_tokens)),
-            ("OR Llama 3.1 8B",  lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.1-8b-instruct:free", max_tokens)),
-            ("OR Gemma 3 4B",    lambda: call_openrouter(prompt, openrouter_key, "google/gemma-3-4b-it:free", max_tokens)),
-            ("OR Llama 3.3 70B", lambda: call_openrouter(prompt, openrouter_key, "meta-llama/llama-3.3-70b-instruct:free", max_tokens)),
-            ("OR Mistral 7B",    lambda: call_openrouter(prompt, openrouter_key, "mistralai/mistral-7b-instruct:free", max_tokens)),
+            ("Llama 3.1 8B",     make_or("meta-llama/llama-3.1-8b-instruct:free")),
+            ("Gemma 3 4B",       make_or("google/gemma-3-4b-it:free")),
+            ("Gemma 3 12B",      make_or("google/gemma-3-12b-it:free")),
+            ("Llama 3.3 70B",    make_or("meta-llama/llama-3.3-70b-instruct:free")),
+            ("DeepSeek R1 free", make_or("deepseek/deepseek-r1:free")),
+            ("Phi 3 Mini",       make_or("microsoft/phi-3-mini-128k-instruct:free")),
+            ("Qwen 2 7B",        make_or("qwen/qwen-2-7b-instruct:free")),
         ]
-
     if gemini_key:
-        attempts.append(
-            ("Gemini Direct", lambda: call_gemini(prompt, gemini_key, max_tokens))
-        )
+        attempts.append(("Gemini Direct", make_gemini()))
 
     if not attempts:
         raise ValueError("請在 Railway Variables 中設定 OPENROUTER_API_KEY 或 GEMINI_API_KEY")
 
+    errors = []
     for name, fn in attempts:
         try:
             result = fn()
-            if result and len(result) > 10:
-                return result
+            return result
         except Exception as e:
             errors.append(f"{name}: {str(e)[:80]}")
             continue
