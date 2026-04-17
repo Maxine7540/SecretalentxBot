@@ -1,40 +1,37 @@
 """
 AI 解讀模組
-使用 Google Gemini API（免費方案）根據命盤數據生成深度分析
+使用 Groq API（免費方案，速度快）根據命盤數據生成深度分析
 """
 
-import os
 import urllib.request
 import urllib.error
 import json
 
 
-def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
-    """呼叫 Google Gemini API，含自動重試"""
-    import time
+def call_groq(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
+    """呼叫 Groq API"""
     if not api_key:
-        raise ValueError("GEMINI_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
+        raise ValueError("GROQ_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}"
+    url = "https://api.groq.com/openai/v1/chat/completions"
     payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0.8
     }).encode("utf-8")
 
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                wait = 30 * (attempt + 1)
-                time.sleep(wait)
-                continue
-            raise
-    raise Exception("請求次數過多，請稍候 2 分鐘後再試")
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        },
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read().decode("utf-8"))
+    return result["choices"][0]["message"]["content"]
 
 
 def build_prompt(data: dict) -> str:
@@ -138,7 +135,7 @@ def build_prompt(data: dict) -> str:
 def get_ai_reading(data: dict, api_key: str) -> str:
     """呼叫 Gemini API 生成綜合命盤解讀"""
     prompt = build_prompt(data)
-    return call_gemini(prompt, api_key, max_tokens=3500)
+    return call_groq(prompt, api_key, max_tokens=3500)
 
 
 def get_year_detail(data: dict, api_key: str) -> str:
@@ -188,7 +185,7 @@ def get_year_detail(data: dict, api_key: str) -> str:
 **今年送給自己的一句話**
 一句真正說到這個流年核心的話，有力量，不陳腔濫調"""
 
-    return call_gemini(prompt, api_key, max_tokens=1500)
+    return call_groq(prompt, api_key, max_tokens=1500)
 
 
 def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
@@ -226,4 +223,4 @@ def get_monthly_detail(data: dict, month: int, api_key: str) -> str:
 **幸運提示**
 本月幸運數字與建議顏色"""
 
-    return call_gemini(prompt, api_key, max_tokens=800)
+    return call_groq(prompt, api_key, max_tokens=800)
