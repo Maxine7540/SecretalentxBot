@@ -163,8 +163,8 @@ def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) ->
 # ── 指令處理 ──────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[
-        KeyboardButton("🔢 開始 /start"),
-        KeyboardButton("📅 輸入生日 /analyze"),
+        KeyboardButton("/start"),
+        KeyboardButton("/analyze"),
     ]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
