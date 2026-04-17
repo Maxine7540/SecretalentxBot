@@ -10,7 +10,8 @@ import json
 
 
 def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
-    """呼叫 Google Gemini API"""
+    """呼叫 Google Gemini API，含自動重試"""
+    import time
     if not api_key:
         raise ValueError("GEMINI_API_KEY 未設定，請在 Railway Variables 中加入此環境變數")
 
@@ -21,9 +22,19 @@ def call_gemini(prompt: str, api_key: str, max_tokens: int = 3500) -> str:
     }).encode("utf-8")
 
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-    return result["candidates"][0]["content"]["parts"][0]["text"]
+
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            return result["candidates"][0]["content"]["parts"][0]["text"]
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait = 15 * (attempt + 1)
+                time.sleep(wait)
+                continue
+            raise
+    raise Exception("請求次數過多，請稍候 1 分鐘後再試")
 
 
 def build_prompt(data: dict) -> str:
