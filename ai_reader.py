@@ -168,13 +168,20 @@ def get_ai_reading(data: dict, api_key: str) -> str:
 
 
 def get_year_detail(data: dict, api_key: str, year_type: str = "current") -> str:
-    if year_type == "next":
+    from numerology import calc_yearly_monthly_grid
+    solar = data["solar"]
+
+    if year_type == "prev":
+        # 生日前 → 上一年
+        target_year = data["personal_year_current"]["year"] - 1
+        py, monthly = calc_yearly_monthly_grid(solar["month"], solar["day"], target_year)
+    elif year_type == "next":
         py = data["personal_year_next"]
         monthly = data["monthly_next"]
     else:
         py = data["personal_year_current"]
         monthly = data["monthly_current"]
-    solar = data["solar"]
+
     birth_single = data["manifest"]["single"]
     is_personal_year = (py["single"] == birth_single)
     month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]

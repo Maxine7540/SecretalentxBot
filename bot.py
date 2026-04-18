@@ -384,18 +384,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return SHOW_MENU
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="請選擇要分析哪一年的流年：",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return SHOW_MENU
 
     elif action == "year_current":
+        # 生日前 → 看上一年
         py = data["personal_year_current"]
-        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年，請稍候...")
+        prev_year = py["year"] - 1
+        await query.edit_message_text(f"📅 正在分析 {prev_year} 年流年（生日前適用），請稍候...")
         try:
-            detail = get_year_detail(data, "", year_type="current")
+            detail = get_year_detail(data, "", year_type="prev")
             chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
             for chunk in chunks:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
@@ -403,10 +399,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 分析出錯：{str(e)[:100]}")
 
     elif action == "year_next":
-        py = data["personal_year_next"]
-        await query.edit_message_text(f"📆 正在分析 {py['year']} 年流年，請稍候...")
+        # 生日後 → 看今年
+        py = data["personal_year_current"]
+        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年（生日後適用），請稍候...")
         try:
-            detail = get_year_detail(data, "", year_type="next")
+            detail = get_year_detail(data, "", year_type="current")
             chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
             for chunk in chunks:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
