@@ -371,13 +371,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "year_menu":
         current_year = data["personal_year_current"]["year"]
-        next_year = data["personal_year_next"]["year"]
-        py_current = data["personal_year_current"]
-        py_next = data["personal_year_next"]
+        solar = data["solar"]
+        birth_month = solar["month"]
+        birth_day = solar["day"]
         keyboard = [[
-            InlineKeyboardButton(f"📅 {current_year}年（流年{py_current['single']}）", callback_data="year_current"),
-            InlineKeyboardButton(f"📆 {next_year}年（流年{py_next['single']}）", callback_data="year_next"),
+            InlineKeyboardButton(f"📅 {current_year} 生日前", callback_data="year_current"),
+            InlineKeyboardButton(f"📅 {current_year} 生日後", callback_data="year_next"),
         ]]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"你今年 {current_year} 的生日（{birth_month}/{birth_day}）過了嗎？\n\n生命靈數的流年運勢從生日當天開始，不是從1月1日。請根據你今年的生日是否已過來選擇：",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="請選擇要分析哪一年的流年：",
