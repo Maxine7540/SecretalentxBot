@@ -60,15 +60,19 @@ def call_gemini(prompt: str, api_key: str, max_tokens: int) -> str:
 
 
 def call_openrouter_safe(prompt: str, api_key: str, model: str, max_tokens: int) -> str:
-    """帶完整錯誤處理的 OpenRouter 呼叫"""
+    """帶完整錯誤處理的 OpenRouter 呼叫，捕獲所有錯誤讓輪換繼續"""
     try:
         result = call_openrouter(prompt, api_key, model, max_tokens)
-        if not result or len(result.strip()) < 10:
-            raise Exception("回傳內容為空")
         return result
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8") if hasattr(e, "read") else ""
+        body = ""
+        try:
+            body = e.read().decode("utf-8")
+        except Exception:
+            pass
         raise Exception(f"HTTP {e.code}: {body[:150]}")
+    except Exception as e:
+        raise Exception(str(e)[:150])
 
 
 def call_ai(prompt: str, api_key: str, max_tokens: int = 1500) -> str:
@@ -88,11 +92,12 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 1500) -> str:
     attempts = []
     if openrouter_key:
         attempts += [
-            ("OpenRouter Auto", make_or("openrouter/free")),
             ("Gemma 3 12B",     make_or("google/gemma-3-12b-it:free")),
             ("Gemma 3 4B",      make_or("google/gemma-3-4b-it:free")),
             ("Llama 3.3 70B",   make_or("meta-llama/llama-3.3-70b-instruct:free")),
             ("Qwen 3 8B",       make_or("qwen/qwen3-8b:free")),
+            ("Mistral Small",   make_or("mistralai/mistral-small-3.1-24b-instruct:free")),
+            ("OpenRouter Auto", make_or("openrouter/free")),
         ]
     if gemini_key:
         attempts.append(("Gemini Direct", make_gemini()))
