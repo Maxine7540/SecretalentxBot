@@ -11,8 +11,9 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
 from numerology import full_analysis, NUMBER_MEANINGS, PERSONAL_YEAR_THEMES
-from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail, get_outer_reading, get_inner_reading
+from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail
 from career_data import format_career_text
+from reading_data import format_outer_reading, format_inner_reading
 
 # ── 設定 ──────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -302,31 +303,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SHOW_MENU
 
     elif action == "outer":
-        await query.edit_message_text("☀️ 正在分析外在性格，請稍候...")
-        try:
-            reading = get_outer_reading(data, "")
+        text = format_outer_reading(
+            data["manifest"],
+            data.get("manifest_meaning", {})
+        )
+        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        for chunk in chunks:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"☀️ 外在性格解析\n\n{reading}",
-            )
-        except Exception as e:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"⚠️ 分析出錯，請稍後再試。\n錯誤：{str(e)[:100]}"
+                text=chunk,
             )
 
     elif action == "inner":
-        await query.edit_message_text("🌙 正在分析內在精神，請稍候...")
-        try:
-            reading = get_inner_reading(data, "")
+        text = format_inner_reading(
+            data["hidden"],
+            data.get("hidden_meaning", {}),
+            data["lunar"]
+        )
+        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        for chunk in chunks:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"🌙 內在精神解析\n\n{reading}",
-            )
-        except Exception as e:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"⚠️ 分析出錯，請稍後再試。\n錯誤：{str(e)[:100]}"
+                text=chunk,
             )
 
     elif action == "ai_full":
