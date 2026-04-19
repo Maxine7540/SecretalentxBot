@@ -45,11 +45,23 @@ def format_grid(grid: dict, color: str = "purple", lang: str = "zh_tw") -> str:
     return "\n".join(lines)
 
 
+def get_number_meanings(lang: str) -> dict:
+    """根據語言取得數字意義對照表"""
+    if lang == "en":
+        try:
+            from i18n.en import NUMBER_MEANINGS_EN
+            return NUMBER_MEANINGS_EN
+        except ImportError:
+            pass
+    return NUMBER_MEANINGS
+
+
 def format_combined_chart(data: dict, lang: str = "zh_tw") -> str:
     manifest = data["manifest"]
     hidden = data["hidden"]
-    m_meaning = data.get("manifest_meaning", {})
-    h_meaning = data.get("hidden_meaning", {})
+    meanings = get_number_meanings(lang)
+    m_meaning = meanings.get(manifest["total"], meanings.get(manifest["single"], {}))
+    h_meaning = meanings.get(hidden.get("total"), meanings.get(hidden.get("single"), {})) if "error" not in hidden else {}
     solar = data["solar"]
 
     calc_m = f"{manifest['digits_display']} = {manifest['raw_sum']}"
@@ -249,6 +261,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SHOW_MENU
 
     elif action == "outer":
+        await query.edit_message_text("⏳ " + ("Please wait..." if lang == "en" else "請稍候..."))
         text = format_outer_reading(data["manifest"], data.get("manifest_meaning", {}))
         if lang != "zh_tw":
             text = await translate_text(text, lang, context)
@@ -257,6 +270,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
     elif action == "inner":
+        await query.edit_message_text("⏳ " + ("Please wait..." if lang == "en" else "請稍候..."))
         text = format_inner_reading(data["hidden"], data.get("hidden_meaning", {}), data["lunar"])
         if lang != "zh_tw":
             text = await translate_text(text, lang, context)
@@ -282,6 +296,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=t("error_analysis", lang, error=str(e)[:80]))
 
     elif action == "career":
+        await query.edit_message_text("⏳ " + ("Please wait..." if lang == "en" else "請稍候..."))
         single = data["manifest"]["single"]
         total = data["manifest"]["total"]
         text = format_career_text(single, total)
@@ -292,6 +307,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
     elif action == "love":
+        await query.edit_message_text("⏳ " + ("Please wait..." if lang == "en" else "請稍候..."))
         compatible = data.get("compatible_numbers", [])
         single = data["manifest"]["single"]
         text = f"{t('love_title', lang)}\n\n{t('love_intro', lang, single=single)}\n\n"
