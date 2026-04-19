@@ -266,6 +266,7 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
         [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
+        [InlineKeyboardButton("🌐 English Version", callback_data="lang_en")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -368,7 +369,148 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
         )
 
-    elif action == "year_menu":
+    elif action == "lang_en":
+        keyboard = [
+            [InlineKeyboardButton("☀️ Outer Personality", callback_data="en_outer"),
+             InlineKeyboardButton("🌙 Inner Spirit", callback_data="en_inner")],
+            [InlineKeyboardButton("🔮 Combined Reading", callback_data="en_full")],
+            [InlineKeyboardButton("💼 Career", callback_data="en_career"),
+             InlineKeyboardButton("💕 Relationships", callback_data="en_love")],
+            [InlineKeyboardButton("📅 Annual Forecast", callback_data="en_year")],
+            [InlineKeyboardButton("🗓 Monthly Forecast", callback_data="en_month_menu")],
+        ]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🌐 English Version\n\nPlease select what you'd like to explore:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
+
+    elif action == "en_outer":
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English reading, please wait...")
+        from reading_data import format_outer_reading
+        chinese_text = format_outer_reading(data["manifest"], data.get("manifest_meaning", {}))
+        try:
+            from ai_reader import call_ai
+            prompt = f"Translate the following Chinese numerology reading into natural, warm English. Keep all the section titles bold. Do not add or remove any content, just translate:\n\n{chinese_text}"
+            result = call_ai(prompt, "", max_tokens=1500)
+            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
+
+    elif action == "en_inner":
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English reading, please wait...")
+        from reading_data import format_inner_reading
+        chinese_text = format_inner_reading(data["hidden"], data.get("hidden_meaning", {}), data["lunar"])
+        try:
+            from ai_reader import call_ai
+            prompt = f"Translate the following Chinese numerology reading into natural, warm English. Keep all the section titles bold. Do not add or remove any content, just translate:\n\n{chinese_text}"
+            result = call_ai(prompt, "", max_tokens=1500)
+            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
+
+    elif action == "en_full":
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English combined reading, please wait about 60 seconds...")
+        try:
+            from ai_reader import call_ai, build_prompt
+            prompt = build_prompt(data) + "\n\nIMPORTANT: Write the entire analysis in English, not Chinese."
+            result = call_ai(prompt, "", max_tokens=1500)
+            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Analysis failed: {str(e)[:100]}")
+
+    elif action == "en_career":
+        from career_data import format_career_text
+        from ai_reader import call_ai
+        chinese_text = format_career_text(data["manifest"]["single"], data["manifest"]["total"])
+        try:
+            prompt = f"Translate the following Chinese career guidance into natural English. Keep section titles bold. Translate accurately without adding or removing content:\n\n{chinese_text}"
+            result = call_ai(prompt, "", max_tokens=1500)
+            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
+
+    elif action == "en_love":
+        compatible = data.get("compatible_numbers", [])
+        single = data["manifest"]["single"]
+        text = f"💕 Relationship Compatibility\n\nYour Life Path Number {single} is most compatible with:\n\n"
+        for n in compatible:
+            meaning = NUMBER_MEANINGS.get(n, {})
+            text += f"• Number {n} ({meaning.get('name', '')}) — {meaning.get('keyword', '')}\n"
+        text += "\n💡 Compatibility is a guide, not a guarantee. Every relationship is unique."
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+
+    elif action == "en_year":
+        py = data["personal_year_current"]
+        solar = data["solar"]
+        birth_month = solar["month"]
+        birth_day = solar["day"]
+        current_year = py["year"]
+        keyboard = [[
+            InlineKeyboardButton(f"📅 Before birthday {current_year}", callback_data="en_year_prev"),
+            InlineKeyboardButton(f"📅 After birthday {current_year}", callback_data="en_year_curr"),
+        ]]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Has your {current_year} birthday ({birth_month}/{birth_day}) passed?\n\nIn numerology, your personal year energy begins on your birthday, not January 1st. Please select:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
+
+    elif action in ("en_year_prev", "en_year_curr"):
+        year_type = "prev" if action == "en_year_prev" else "current"
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English annual forecast, please wait...")
+        try:
+            from ai_reader import get_year_detail
+            result = get_year_detail(data, "", year_type=year_type)
+            from ai_reader import call_ai
+            prompt = f"Translate this Chinese numerology annual forecast into natural English. Keep section titles bold:\n\n{result}"
+            translated = call_ai(prompt, "", max_tokens=1200)
+            chunks = [translated[i:i+4000] for i in range(0, len(translated), 4000)]
+            for chunk in chunks:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Failed: {str(e)[:100]}")
+
+    elif action == "en_month_menu":
+        month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        monthly = data["monthly_current"]
+        keyboard = []
+        row = []
+        for i, pm in enumerate(monthly):
+            row.append(InlineKeyboardButton(f"{month_names[i]}({pm['single']})", callback_data=f"en_month_{i+1}"))
+            if len(row) == 3:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"🗓 {data['personal_year_current']['year']} — Select a month to analyse:\n(Number in brackets = monthly energy number)",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return SHOW_MENU
+
+    elif action.startswith("en_month_"):
+        target_month = int(action.split("_")[2])
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⏳ Generating forecast for month {target_month}...")
+        try:
+            from ai_reader import get_monthly_detail, call_ai
+            result = get_monthly_detail(data, target_month, "")
+            prompt = f"Translate this Chinese numerology monthly forecast into natural English. Keep section titles bold:\n\n{result}"
+            translated = call_ai(prompt, "", max_tokens=800)
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=translated)
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Failed: {str(e)[:100]}")
         current_year = data["personal_year_current"]["year"]
         solar = data["solar"]
         birth_month = solar["month"]
@@ -473,6 +615,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
         [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
         [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
+        [InlineKeyboardButton("🌐 English Version", callback_data="lang_en")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
