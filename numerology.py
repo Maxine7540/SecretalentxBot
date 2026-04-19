@@ -167,18 +167,24 @@ def calc_hidden_chart(lunar: dict) -> dict:
 # 流年流月
 # ───────────────────────────────────────────────
 def calc_personal_year(birth_month: int, birth_day: int, target_year: int) -> dict:
-    """計算流年數：年份所有數字 + 月 + 日"""
+    """計算流年數：年份所有數字 + 月 + 日，直接縮到個位數（不保留主命數）"""
     all_digits = f"{target_year}{birth_month:02d}{birth_day:02d}"
     raw_sum = sum(int(d) for d in all_digits)
-    total, single = reduce_to_single(raw_sum)
-    return {"year": target_year, "total": total, "single": single, "raw_sum": raw_sum, "all_digits": all_digits}
+    # 流年直接縮到個位數，不保留 11/22
+    single = raw_sum
+    while single > 9:
+        single = sum(int(d) for d in str(single))
+    return {"year": target_year, "total": raw_sum, "single": single, "raw_sum": raw_sum, "all_digits": all_digits}
 
 
 def calc_personal_month(personal_year_single: int, target_month: int) -> dict:
-    """計算流月數"""
+    """計算流月數，強制縮到個位數（不保留主命數）"""
     raw = personal_year_single + target_month
-    total, single = reduce_to_single(raw)
-    return {"month": target_month, "total": total, "single": single}
+    # 流月不保留 11/22，直接縮到個位數
+    single = raw
+    while single > 9:
+        single = sum(int(d) for d in str(single))
+    return {"month": target_month, "total": raw, "single": single}
 
 
 def calc_yearly_monthly_grid(birth_month: int, birth_day: int, target_year: int) -> list:
