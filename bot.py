@@ -160,14 +160,18 @@ def main_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """顯示語言選單"""
+    from telegram import ReplyKeyboardRemove
     keyboard = []
     for code in AVAILABLE_LANGUAGES:
         keyboard.append([InlineKeyboardButton(SUPPORTED_LANGUAGES[code], callback_data=f"set_lang_{code}")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    bottom = ReplyKeyboardMarkup([[KeyboardButton("開始"), KeyboardButton("Start")]], resize_keyboard=True)
     await update.message.reply_text(
         "🌏 請選擇語言 / Please select your language",
-        reply_markup=reply_markup
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await update.message.reply_text(
+        "👇",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return SHOW_MENU
 
@@ -184,13 +188,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if chosen in AVAILABLE_LANGUAGES:
             context.user_data["lang"] = chosen
             lang = chosen
-            bottom = ReplyKeyboardMarkup([[KeyboardButton("開始"), KeyboardButton("Start")]], resize_keyboard=True)
-            await query.edit_message_text(t("language_set", lang))
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=t("welcome", lang),
-                reply_markup=bottom
-            )
+        else:
+            lang = "zh_tw"
+            context.user_data["lang"] = lang
+
+        # 底部按鈕根據語言顯示
+        btn_labels = {
+            "zh_tw": "開始",
+            "en": "Start",
+            "zh_cn": "开始",
+            "ja": "スタート",
+            "ko": "시작",
+            "km": "ចាប់ផ្តើម",
+            "vi": "Bắt đầu",
+            "th": "เริ่ม",
+        }
+        btn_label = btn_labels.get(lang, "開始")
+        bottom = ReplyKeyboardMarkup([[KeyboardButton(btn_label)]], resize_keyboard=True)
+
+        await query.edit_message_text(t("language_set", lang))
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=t("welcome", lang),
+        )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=t("ask_date", lang),
+            reply_markup=bottom
+        )
         return ASK_DATE
 
     if action == "change_lang":
@@ -382,10 +407,6 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_lang(context)
     text = update.message.text.strip().replace("-", "/").replace(".", "/")
 
-    # 如果用戶按了「開始/Start」，顯示語言選單
-    if text.lower() in ["開始", "start", "/start"]:
-        return await start(update, context)
-
     try:
         parts = text.split("/")
         year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
@@ -475,12 +496,33 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
-            MessageHandler(filters.Regex("^(開始|Start)$"), start),
+            MessageHandler(
+                filters.Regex("^(開始|Start|开始|スタート|시작|ចាប់ផ្តើម|Bắt đầu|เริ่ม)$"),
+                start
+            ),
         ],
         states={
-            ASK_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date)],
-            ASK_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_time)],
-            SHOW_MENU: [CallbackQueryHandler(handle_callback)],
+            ASK_DATE: [
+                MessageHandler(
+                    filters.Regex("^(開始|Start|开始|スタート|시작|ចាប់ផ្តើម|Bắt đầu|เริ่ม)$"),
+                    start
+                ),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date),
+            ],
+            ASK_TIME: [
+                MessageHandler(
+                    filters.Regex("^(開始|Start|开始|スタート|시작|ចាប់ផ្តើម|Bắt đầu|เริ่ม)$"),
+                    start
+                ),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_time),
+            ],
+            SHOW_MENU: [
+                MessageHandler(
+                    filters.Regex("^(開始|Start|开始|スタート|시작|ចាប់ផ្តើម|Bắt đầu|เริ่ม)$"),
+                    start
+                ),
+                CallbackQueryHandler(handle_callback),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
