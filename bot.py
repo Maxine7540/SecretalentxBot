@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 from numerology import full_analysis, NUMBER_MEANINGS, PERSONAL_YEAR_THEMES
 from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail, get_outer_reading, get_inner_reading
+from career_data import format_career_text
 
 # ── 設定 ──────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -346,15 +347,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     elif action == "career":
-        careers = data.get("careers", [])
         single = data["manifest"]["single"]
-        text = f"💼 *適合從事的職業方向*\n\n"
-        text += f"你的命數 {single} 最適合：\n\n"
-        for i, c in enumerate(careers, 1):
-            text += f"{i}. {c}\n"
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
-        )
+        total = data["manifest"]["total"]
+        text = format_career_text(single, total)
+        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        for chunk in chunks:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=chunk,
+            )
 
     elif action == "love":
         compatible = data.get("compatible_numbers", [])
