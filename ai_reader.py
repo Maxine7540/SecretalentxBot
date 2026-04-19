@@ -88,13 +88,12 @@ def call_ai(prompt: str, api_key: str, max_tokens: int = 1500) -> str:
     attempts = []
     if openrouter_key:
         attempts += [
-            ("Llama 3.1 8B",     make_or("meta-llama/llama-3.1-8b-instruct:free")),
-            ("Gemma 3 4B",       make_or("google/gemma-3-4b-it:free")),
-            ("Gemma 3 12B",      make_or("google/gemma-3-12b-it:free")),
-            ("Llama 3.3 70B",    make_or("meta-llama/llama-3.3-70b-instruct:free")),
-            ("DeepSeek R1 free", make_or("deepseek/deepseek-r1:free")),
-            ("Phi 3 Mini",       make_or("microsoft/phi-3-mini-128k-instruct:free")),
-            ("Qwen 2 7B",        make_or("qwen/qwen-2-7b-instruct:free")),
+            ("DeepSeek V3",   make_or("deepseek/deepseek-chat-v3-0324:free")),
+            ("Gemma 3 12B",   make_or("google/gemma-3-12b-it:free")),
+            ("Gemma 3 4B",    make_or("google/gemma-3-4b-it:free")),
+            ("Qwen 3 8B",     make_or("qwen/qwen3-8b:free")),
+            ("Llama 3.3 70B", make_or("meta-llama/llama-3.3-70b-instruct:free")),
+            ("Mistral 7B",    make_or("mistralai/mistral-7b-instruct:free")),
         ]
     if gemini_key:
         attempts.append(("Gemini Direct", make_gemini()))
