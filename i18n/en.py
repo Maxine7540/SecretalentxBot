@@ -1,5 +1,19 @@
 """English language file"""
 
+NUMBER_MEANINGS_EN = {
+    1:  {"name": "Leader",        "keyword": "Independence, Innovation, Initiative"},
+    2:  {"name": "Cooperator",    "keyword": "Harmony, Sensitivity, Diplomacy"},
+    3:  {"name": "Creator",       "keyword": "Expression, Art, Social"},
+    4:  {"name": "Builder",       "keyword": "Practicality, Discipline, Structure"},
+    5:  {"name": "Free Spirit",   "keyword": "Change, Adventure, Communication"},
+    6:  {"name": "Nurturer",      "keyword": "Family, Healing, Beauty"},
+    7:  {"name": "Seeker",        "keyword": "Analysis, Spirituality, Research"},
+    8:  {"name": "Achiever",      "keyword": "Career, Wealth, Authority"},
+    9:  {"name": "Humanitarian",  "keyword": "Compassion, Completion, Global"},
+    11: {"name": "Intuitive",     "keyword": "Inspiration, Revelation, Intuition"},
+    22: {"name": "Master Builder","keyword": "Vision, Manifestation, Legacy"},
+}
+
 STRINGS = {
     "select_language": "🌏 Please select your language / 請選擇語言",
     "language_set": "✅ Language set to English",
