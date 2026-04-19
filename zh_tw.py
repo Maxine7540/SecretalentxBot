@@ -1,0 +1,78 @@
+"""繁體中文語言檔"""
+
+STRINGS = {
+    "select_language": "🌏 請選擇語言 / Please select your language",
+    "language_set": "✅ 已設定為繁體中文",
+    "welcome": (
+        "✨ 歡迎來到生命靈數 Bot！\n\n"
+        "我可以為你找出你的隱藏天賦：\n"
+        "☀️ 外在性格命盤\n"
+        "🌙 內在精神命盤\n"
+        "🔮 綜合命盤深度解析\n\n"
+        "📅 請輸入你的西曆出生日期\n"
+        "格式：YYYY/MM/DD\n"
+        "範例：1990/05/15"
+    ),
+    "ask_date": "📅 請輸入你的西曆出生日期\n\n格式：YYYY/MM/DD\n範例：1990/05/15",
+    "ask_time": "🕐 請輸入你的出生時辰（24小時制，例如：14 代表下午2點）\n\n如果不知道，請輸入：略過",
+    "invalid_date": "⚠️ 日期格式不正確，請重新輸入\n例如：1990/05/15",
+    "invalid_time": "⚠️ 時間格式不正確，請輸入 0-23 之間的數字，或輸入「略過」",
+    "calculating": "⏳ 正在計算你的命盤，請稍候...",
+    "skip_keywords": ["略過", "skip", "無", "不知道"],
+    "chart_title": "✨ 靈數命盤",
+    "solar_label": "☀️ 西曆生日",
+    "lunar_label": "🌙 農曆生日",
+    "talent_number": "天賦數",
+    "life_number": "本命靈數",
+    "outer_chart": "外在性格命盤",
+    "inner_chart": "內在精神命盤",
+    "combined_chart": "綜合命盤圈數分佈",
+    "strong_number": "⚡ 強勢數",
+    "missing_number": "🕳 空缺數",
+    "none": "無",
+    "empty": "空缺",
+    "lunar_error": "⚠️ 農曆轉換失敗",
+    "annual_number": "流年數",
+    "personal_year_msg": "⭐ 本命年！能量特別強烈",
+    "annual_hint": "💡 點下方按鈕查看流年詳解或各月流月分析",
+    "select_content": "請選擇你想要深入了解的內容：",
+    "select_analysis": "請選擇命盤分析項目：",
+    "want_more": "還想了解什麼？",
+    "btn_chart": "🔮 命盤分析",
+    "btn_annual": "📅 流年詳解",
+    "btn_monthly": "🗓 選擇流月分析",
+    "btn_language": "🌐 切換語言",
+    "btn_outer": "☀️ 外在性格",
+    "btn_inner": "🌙 內在精神",
+    "btn_combined": "🔮 綜合分析",
+    "btn_career": "💼 適合職業",
+    "btn_love": "💕 感情對象",
+    "select_month": "選擇要分析的月份：\n括號內為該月流月數",
+    "month_names": ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"],
+    "birthday_question": "你今年 {year} 的生日（{month}/{day}）過了嗎？\n\n生命靈數的流年運勢從生日當天開始，不是從1月1日。請根據你今年的生日是否已過來選擇：",
+    "btn_before_birthday": "📅 {year} 生日前",
+    "btn_after_birthday": "📅 {year} 生日後",
+    "analyzing_annual_prev": "📅 正在分析流年（生日前適用），請稍候...",
+    "analyzing_annual_curr": "📅 正在分析流年（生日後適用），請稍候...",
+    "analyzing_monthly": "📅 正在分析 {year} 年 {month} 月的流月，請稍候約15秒...",
+    "monthly_title": "🗓 {year}年{month}月流月分析",
+    "analyzing_combined": "🔮 正在進行綜合命盤分析，請稍候約 60 秒，請勿重複點擊...",
+    "combined_title": "🔮 綜合命盤分析",
+    "love_title": "💕 感情相容分析",
+    "love_intro": "你的命數 {single} 最相容的對象：",
+    "love_disclaimer": "💡 相容不代表一定合適，命盤僅供參考",
+    "error_no_data": "⚠️ 找不到你的分析資料，請重新輸入 /start",
+    "error_analysis": "⚠️ 分析出錯，請稍後再試。\n錯誤：{error}",
+    "cancel_msg": "已取消。輸入 /start 重新開始。",
+    "year_themes": {
+        1: "新週期開始，播種與行動之年",
+        2: "耐心等待，關係與合作之年",
+        3: "表達自我，創意與社交之年",
+        4: "努力建設，打基礎的一年",
+        5: "改變與自由，突破舒適圈之年",
+        6: "責任與家庭，療癒修復之年",
+        7: "內省與靈性成長之年",
+        8: "豐收與成就，財務事業之年",
+        9: "結束與放下，完成循環之年",
+    },
+}

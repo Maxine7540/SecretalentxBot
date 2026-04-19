@@ -1,5 +1,5 @@
 """
-生命靈數 Telegram Bot 主程式
+生命靈數 Telegram Bot — 多語言版
 """
 
 import os
@@ -10,267 +10,163 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
-from numerology import full_analysis, NUMBER_MEANINGS, PERSONAL_YEAR_THEMES
+from numerology import full_analysis, NUMBER_MEANINGS
 from ai_reader import get_ai_reading, get_monthly_detail, get_year_detail
 from career_data import format_career_text
 from reading_data import format_outer_reading, format_inner_reading
+from i18n import t, SUPPORTED_LANGUAGES, AVAILABLE_LANGUAGES
 
-# ── 設定 ──────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
-# 對話狀態
 ASK_DATE, ASK_TIME, SHOW_MENU = range(3)
 
-# 暫存用戶數據（使用 context.user_data，跟隨 Telegram session）
-# user_data_store 已棄用，改用 context.user_data
-
-
-# emoji 數字對照
 NUM_EMOJI = {1:"1️⃣",2:"2️⃣",3:"3️⃣",4:"4️⃣",5:"5️⃣",6:"6️⃣",7:"7️⃣",8:"8️⃣",9:"9️⃣"}
 
 
-def format_grid(grid: dict, color: str = "purple") -> str:
-    """格式化命盤圈數：emoji數字 + 圓點"""
+def get_lang(context) -> str:
+    return context.user_data.get("lang", "zh_tw")
+
+
+def format_grid(grid: dict, color: str = "purple", lang: str = "zh_tw") -> str:
     dot = "🟣" if color == "purple" else ("🟡" if color == "gold" else "🟢")
+    empty_label = t("empty", lang)
     lines = []
     for n in range(1, 10):
         count = grid.get(n, 0)
         emoji = NUM_EMOJI[n]
         if count == 0:
-            lines.append(f"{emoji}  空缺")
+            lines.append(f"{emoji}  {empty_label}")
         else:
             lines.append(f"{emoji}  {dot * count}")
     return "\n".join(lines)
 
 
-def format_combined_chart(data: dict) -> str:
-    """將外在性格命盤、內在精神命盤、綜合命盤合併成一個完整訊息"""
+def format_combined_chart(data: dict, lang: str = "zh_tw") -> str:
     manifest = data["manifest"]
     hidden = data["hidden"]
     m_meaning = data.get("manifest_meaning", {})
     h_meaning = data.get("hidden_meaning", {})
     solar = data["solar"]
 
-    # 加總過程字串（西曆）
     calc_m = f"{manifest['digits_display']} = {manifest['raw_sum']}"
     if manifest.get("step2"):
         calc_m += f" → {manifest['step2']}"
 
-    text = "✨ *靈數命盤*\n\n"
-
-    # ── 外在性格命盤（西曆）──
-    text += "☀️ *西曆生日*\n"
+    text = f"✨ {t('chart_title', lang)}\n\n"
+    text += f"{t('solar_label', lang)}\n"
     text += f"{solar['year']} / {solar['month']:02d} / {solar['day']:02d}\n"
     text += f"{calc_m}\n"
-    text += f"天賦數 *{manifest['total']}*　本命靈數 *{manifest['single']}*\n"
+    text += f"{t('talent_number', lang)} *{manifest['total']}*　{t('life_number', lang)} *{manifest['single']}*\n"
     text += f"{m_meaning.get('name', '')} — {m_meaning.get('keyword', '')}\n\n"
-    text += "*外在性格命盤*\n"
-    text += format_grid(manifest["grid"], "purple") + "\n\n"
+    text += f"*{t('outer_chart', lang)}*\n"
+    text += format_grid(manifest["grid"], "purple", lang) + "\n\n"
     if manifest["strong_numbers"]:
         nums = "、".join([f"{k}（{v}圈）" for k, v in manifest["strong_numbers"].items()])
-        text += f"⚡ 強勢數：{nums}\n"
+        text += f"{t('strong_number', lang)}：{nums}\n"
     else:
-        text += "⚡ 強勢數：無\n"
+        text += f"{t('strong_number', lang)}：{t('none', lang)}\n"
     if manifest["missing_numbers"]:
-        nums = "、".join(str(n) for n in manifest["missing_numbers"])
-        text += f"🕳 空缺數：{nums}\n"
+        text += f"{t('missing_number', lang)}：{'、'.join(str(n) for n in manifest['missing_numbers'])}\n"
     else:
-        text += "🕳 空缺數：無\n"
+        text += f"{t('missing_number', lang)}：{t('none', lang)}\n"
 
     text += "\n━━━━━━━━━━━━━━━\n\n"
 
-    # ── 內在精神命盤（農曆）──
     if "error" in hidden:
-        text += f"🌙 *農曆生日*\n⚠️ 農曆轉換失敗：{hidden['error']}\n"
+        text += f"{t('lunar_label', lang)}\n{t('lunar_error', lang)}: {hidden['error']}\n"
     else:
         lunar = data["lunar"]
         calc_h = f"{hidden['digits_display']} = {hidden['raw_sum']}"
         if hidden.get("step2"):
             calc_h += f" → {hidden['step2']}"
-
-        text += f"🌙 *農曆生日*\n"
+        text += f"{t('lunar_label', lang)}\n"
         text += f"{lunar['year']} / {lunar['month']:02d} / {lunar['day']:02d}（{lunar.get('zodiac','')}年）\n"
         text += f"{calc_h}\n"
-        text += f"天賦數 *{hidden['total']}*　本命靈數 *{hidden['single']}*\n"
+        text += f"{t('talent_number', lang)} *{hidden['total']}*　{t('life_number', lang)} *{hidden['single']}*\n"
         text += f"{h_meaning.get('name', '')} — {h_meaning.get('keyword', '')}\n\n"
-        text += "*內在精神命盤*\n"
-        text += format_grid(hidden["grid"], "gold") + "\n\n"
+        text += f"*{t('inner_chart', lang)}*\n"
+        text += format_grid(hidden["grid"], "gold", lang) + "\n\n"
         if hidden["strong_numbers"]:
             nums = "、".join([f"{k}（{v}圈）" for k, v in hidden["strong_numbers"].items()])
-            text += f"⚡ 強勢數：{nums}\n"
+            text += f"{t('strong_number', lang)}：{nums}\n"
         else:
-            text += "⚡ 強勢數：無\n"
+            text += f"{t('strong_number', lang)}：{t('none', lang)}\n"
         if hidden["missing_numbers"]:
-            nums = "、".join(str(n) for n in hidden["missing_numbers"])
-            text += f"🕳 空缺數：{nums}\n"
+            text += f"{t('missing_number', lang)}：{'、'.join(str(n) for n in hidden['missing_numbers'])}\n"
         else:
-            text += "🕳 空缺數：無\n"
+            text += f"{t('missing_number', lang)}：{t('none', lang)}\n"
 
     text += "\n━━━━━━━━━━━━━━━\n\n"
 
-    # ── 綜合命盤 ──
     combined_grid = {}
     for n in range(1, 10):
         combined_grid[n] = manifest["grid"].get(n, 0) + (hidden.get("grid", {}).get(n, 0) if "error" not in hidden else 0)
     combined_strong = {k: v for k, v in combined_grid.items() if v >= 5}
-    # 若無 ≥5 圈，取最多圈的數（需 ≥1）
     if not combined_strong:
         max_val = max(combined_grid.values())
-        if max_val >= 1:
-            combined_strong_display = "、".join([f"{k}（{v}圈）" for k, v in combined_grid.items() if v == max_val])
-        else:
-            combined_strong_display = "無"
+        combined_strong_display = "、".join([f"{k}（{v}圈）" for k, v in combined_grid.items() if v == max_val]) if max_val >= 1 else t("none", lang)
     else:
         combined_strong_display = "、".join([f"{k}（{v}圈）" for k, v in combined_strong.items()])
     combined_missing = [n for n in range(1, 10) if combined_grid.get(n, 0) == 0]
 
-    text += "*綜合命盤圈數分佈*\n"
-    text += format_grid(combined_grid, "teal") + "\n\n"
-    text += f"⚡ 強勢數：{combined_strong_display}\n"
+    text += f"*{t('combined_chart', lang)}*\n"
+    text += format_grid(combined_grid, "teal", lang) + "\n\n"
+    text += f"{t('strong_number', lang)}：{combined_strong_display}\n"
     if combined_missing:
-        text += f"🕳 空缺數：{'、'.join(str(n) for n in combined_missing)}\n"
+        text += f"{t('missing_number', lang)}：{'、'.join(str(n) for n in combined_missing)}\n"
     else:
-        text += "🕳 空缺數：無\n"
+        text += f"{t('missing_number', lang)}：{t('none', lang)}\n"
 
     return text
 
 
-def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int) -> str:
+def format_yearly_grid(py: dict, monthly: list, year: int, birth_single: int, lang: str = "zh_tw") -> str:
     is_personal_year = (py["single"] == birth_single)
     all_digits = py.get("all_digits", "")
     digits_str = "+".join(all_digits) if all_digits else ""
     raw = py.get("raw_sum", "")
     single = py["single"]
 
-    # 計算過程：例如 2+0+2+6+0+8+1+6 = 25 → 2+5 = 7
     if raw > 9:
         second_step = "+".join(str(d) for d in str(raw))
         calc_str = f"`{digits_str} = {raw} → {second_step} = {single}`"
     else:
         calc_str = f"`{digits_str} = {single}`"
 
-    text = f"📆 *{year}年流年*\n"
+    year_themes = t("year_themes", lang)
+    theme = year_themes.get(single, "") if isinstance(year_themes, dict) else ""
+
+    text = f"📆 *{year}{t('annual_number', lang)}*\n"
     text += f"{calc_str}\n"
-    text += f"流年數 *{single}*　{PERSONAL_YEAR_THEMES.get(single, '')}\n"
+    text += f"{t('annual_number', lang)} *{single}*　{theme}\n"
     if is_personal_year:
-        text += "⭐ 本命年！能量特別強烈\n"
-    text += "\n💡 點下方按鈕查看流年詳解或各月流月分析"
+        text += f"{t('personal_year_msg', lang)}\n"
+    text += f"\n{t('annual_hint', lang)}"
     return text
 
 
-# ── 指令處理 ──────────────────────────────────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[KeyboardButton("開始")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        "✨ 歡迎來到生命靈數 Bot！\n\n"
-        "我可以為你找出你的隱藏天賦：\n"
-        "☀️ 外在性格命盤\n"
-        "🌙 內在精神命盤\n"
-        "🔮 綜合命盤深度解析\n\n"
-        "📅 請輸入你的西曆出生日期\n"
-        "格式：YYYY/MM/DD\n"
-        "範例：1990/05/15",
-        reply_markup=reply_markup
-    )
-    return ASK_DATE
-
-
-async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📖 *使用說明*\n\n"
-        "1. 輸入 /analyze 開始\n"
-        "2. 輸入你的西曆出生日期（格式：YYYY/MM/DD）\n"
-        "   例如：1990/05/15\n"
-        "3. 輸入出生時辰（或輸入「略過」）\n"
-        "4. 選擇你想要的分析類型\n\n"
-        "💡 所有分析均免費使用",
-        parse_mode="Markdown"
-    )
-
-
-
-async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip().replace("-", "/").replace(".", "/")
-    try:
-        parts = text.split("/")
-        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
-        assert 1900 <= year <= 2100
-        assert 1 <= month <= 12
-        assert 1 <= day <= 31
-    except Exception:
-        await update.message.reply_text(
-            "⚠️ 日期格式不正確，請重新輸入\n例如：1990/05/15"
-        )
-        return ASK_DATE
-
-    user_id = update.effective_user.id
-    context.user_data["year"] = year
-    context.user_data["month"] = month
-    context.user_data["day"] = day
-
-    await update.message.reply_text(
-        "🕐 請輸入你的*出生時辰*（24小時制，例如：14 代表下午2點）\n\n"
-        "如果不知道，請輸入：略過",
-        parse_mode="Markdown"
-    )
-    return ASK_TIME
-
-
-async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    user_id = update.effective_user.id
-    stored = context.user_data
-
-    birth_hour = None
-    if text not in ["略過", "skip", "無", "不知道"]:
-        try:
-            birth_hour = int(text)
-            assert 0 <= birth_hour <= 23
-        except Exception:
-            await update.message.reply_text("⚠️ 時間格式不正確，請輸入 0-23 之間的數字，或輸入「略過」")
-            return ASK_TIME
-
-    context.user_data["hour"] = birth_hour
-
-    # 計算命盤
-    await update.message.reply_text("⏳ 正在計算你的命盤，請稍候...")
-
-    try:
-        data = full_analysis(
-            stored["year"], stored["month"], stored["day"], birth_hour
-        )
-        context.user_data["analysis"] = data
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ 計算出現問題：{e}")
-        return ConversationHandler.END
-
-    # 顯示合併命盤（顯性＋隱性合為一則）
-    combined_text = format_combined_chart(data)
-    yearly_text = format_yearly_grid(
-        data["personal_year_current"],
-        data["monthly_current"],
-        data["personal_year_current"]["year"],
-        data["manifest"]["single"]
-    )
-
-    await update.message.reply_text(combined_text, parse_mode="Markdown")
-    await update.message.reply_text(yearly_text, parse_mode="Markdown")
-
-    # 顯示選單按鈕
+def main_keyboard(lang: str) -> InlineKeyboardMarkup:
     keyboard = [
-        [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
-        [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
-        [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
-        [InlineKeyboardButton("🌐 English Version", callback_data="lang_en")],
+        [InlineKeyboardButton(t("btn_chart", lang), callback_data="chart_menu")],
+        [InlineKeyboardButton(t("btn_annual", lang), callback_data="year_menu")],
+        [InlineKeyboardButton(t("btn_monthly", lang), callback_data="month_menu")],
+        [InlineKeyboardButton(t("btn_language", lang), callback_data="change_lang")],
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for code in AVAILABLE_LANGUAGES:
+        keyboard.append([InlineKeyboardButton(SUPPORTED_LANGUAGES[code], callback_data=f"set_lang_{code}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
+    bottom = ReplyKeyboardMarkup([[KeyboardButton("開始"), KeyboardButton("Start")]], resize_keyboard=True)
     await update.message.reply_text(
-        "請選擇你想要深入了解的內容：",
+        "🌏 請選擇語言 / Please select your language",
         reply_markup=reply_markup
     )
     return SHOW_MENU
@@ -279,359 +175,294 @@ async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = update.effective_user.id
-    stored = context.user_data
-    data = stored.get("analysis")
+    action = query.data
+    lang = get_lang(context)
 
-    if not data:
-        await query.edit_message_text("⚠️ 找不到你的分析資料，請重新輸入 /analyze")
+    # ── 語言設定 ──
+    if action.startswith("set_lang_"):
+        chosen = action.replace("set_lang_", "")
+        if chosen in AVAILABLE_LANGUAGES:
+            context.user_data["lang"] = chosen
+            lang = chosen
+            bottom = ReplyKeyboardMarkup([[KeyboardButton("開始"), KeyboardButton("Start")]], resize_keyboard=True)
+            await query.edit_message_text(t("language_set", lang))
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=t("welcome", lang),
+                reply_markup=bottom
+            )
+        return ASK_DATE
+
+    if action == "change_lang":
+        keyboard = []
+        for code in AVAILABLE_LANGUAGES:
+            keyboard.append([InlineKeyboardButton(SUPPORTED_LANGUAGES[code], callback_data=f"set_lang_{code}")])
+        await query.edit_message_text(
+            "🌏 請選擇語言 / Please select your language",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return SHOW_MENU
 
-    action = query.data
+    # ── 需要命盤資料的操作 ──
+    data = context.user_data.get("analysis")
+    if not data:
+        await query.edit_message_text(t("error_no_data", lang))
+        return SHOW_MENU
 
     if action == "chart_menu":
         keyboard = [
-            [InlineKeyboardButton("☀️ 外在性格", callback_data="outer"),
-             InlineKeyboardButton("🌙 內在精神", callback_data="inner")],
-            [InlineKeyboardButton("🔮 綜合分析", callback_data="ai_full")],
-            [InlineKeyboardButton("💼 適合職業", callback_data="career"),
-             InlineKeyboardButton("💕 感情對象", callback_data="love")],
+            [InlineKeyboardButton(t("btn_outer", lang), callback_data="outer"),
+             InlineKeyboardButton(t("btn_inner", lang), callback_data="inner")],
+            [InlineKeyboardButton(t("btn_combined", lang), callback_data="ai_full")],
+            [InlineKeyboardButton(t("btn_career", lang), callback_data="career"),
+             InlineKeyboardButton(t("btn_love", lang), callback_data="love")],
         ]
         await query.edit_message_text(
-            "請選擇命盤分析項目：",
+            t("select_analysis", lang),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return SHOW_MENU
 
     elif action == "outer":
-        text = format_outer_reading(
-            data["manifest"],
-            data.get("manifest_meaning", {})
-        )
+        text = format_outer_reading(data["manifest"], data.get("manifest_meaning", {}))
+        if lang != "zh_tw":
+            text = await translate_text(text, lang, context)
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
         for chunk in chunks:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=chunk,
-            )
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
     elif action == "inner":
-        text = format_inner_reading(
-            data["hidden"],
-            data.get("hidden_meaning", {}),
-            data["lunar"]
-        )
+        text = format_inner_reading(data["hidden"], data.get("hidden_meaning", {}), data["lunar"])
+        if lang != "zh_tw":
+            text = await translate_text(text, lang, context)
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
         for chunk in chunks:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=chunk,
-            )
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
     elif action == "ai_full":
-        await query.edit_message_text("🔮 正在進行綜合命盤分析，請稍候約 60 秒，請勿重複點擊...")
+        await query.edit_message_text(t("analyzing_combined", lang))
         try:
-            reading = get_ai_reading(data, "")
+            from ai_reader import build_prompt, call_ai
+            prompt = build_prompt(data)
+            if lang != "zh_tw":
+                prompt += f"\n\nWrite the entire analysis in English."
+            reading = call_ai(prompt, "", max_tokens=1500)
+            if lang != "zh_tw":
+                reading = await translate_text(reading, lang, context)
             chunks = [reading[i:i+4000] for i in range(0, len(reading), 4000)]
             for i, chunk in enumerate(chunks):
-                header = "🔮 綜合命盤分析\n\n" if i == 0 else ""
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"{header}{chunk}",
-                )
+                header = f"{t('combined_title', lang)}\n\n" if i == 0 else ""
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{header}{chunk}")
         except Exception as e:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"⚠️ 分析出錯，請稍後再試。\n錯誤：{str(e)[:100]}"
-            )
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=t("error_analysis", lang, error=str(e)[:80]))
 
     elif action == "career":
         single = data["manifest"]["single"]
         total = data["manifest"]["total"]
         text = format_career_text(single, total)
+        if lang != "zh_tw":
+            text = await translate_text(text, lang, context)
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
         for chunk in chunks:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=chunk,
-            )
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
     elif action == "love":
         compatible = data.get("compatible_numbers", [])
         single = data["manifest"]["single"]
-        text = f"💕 *感情相容分析*\n\n"
-        text += f"你的命數 {single} 最相容的對象：\n\n"
+        text = f"{t('love_title', lang)}\n\n{t('love_intro', lang, single=single)}\n\n"
         for n in compatible:
             meaning = NUMBER_MEANINGS.get(n, {})
-            text += f"• 命數 *{n}*（{meaning.get('name', '')}）— {meaning.get('keyword', '')}\n"
-        text += "\n💡 相容不代表一定合適，命盤僅供參考"
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
-        )
-
-    elif action == "lang_en":
-        keyboard = [
-            [InlineKeyboardButton("☀️ Outer Personality", callback_data="en_outer"),
-             InlineKeyboardButton("🌙 Inner Spirit", callback_data="en_inner")],
-            [InlineKeyboardButton("🔮 Combined Reading", callback_data="en_full")],
-            [InlineKeyboardButton("💼 Career", callback_data="en_career"),
-             InlineKeyboardButton("💕 Relationships", callback_data="en_love")],
-            [InlineKeyboardButton("📅 Annual Forecast", callback_data="en_year")],
-            [InlineKeyboardButton("🗓 Monthly Forecast", callback_data="en_month_menu")],
-        ]
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="🌐 English Version\n\nPlease select what you'd like to explore:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return SHOW_MENU
-
-    elif action == "en_outer":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English reading, please wait...")
-        from reading_data import format_outer_reading
-        chinese_text = format_outer_reading(data["manifest"], data.get("manifest_meaning", {}))
-        try:
-            from ai_reader import call_ai
-            prompt = f"Translate the following Chinese numerology reading into natural, warm English. Keep all the section titles bold. Do not add or remove any content, just translate:\n\n{chinese_text}"
-            result = call_ai(prompt, "", max_tokens=1500)
-            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
-
-    elif action == "en_inner":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English reading, please wait...")
-        from reading_data import format_inner_reading
-        chinese_text = format_inner_reading(data["hidden"], data.get("hidden_meaning", {}), data["lunar"])
-        try:
-            from ai_reader import call_ai
-            prompt = f"Translate the following Chinese numerology reading into natural, warm English. Keep all the section titles bold. Do not add or remove any content, just translate:\n\n{chinese_text}"
-            result = call_ai(prompt, "", max_tokens=1500)
-            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
-
-    elif action == "en_full":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English combined reading, please wait about 60 seconds...")
-        try:
-            from ai_reader import call_ai, build_prompt
-            prompt = build_prompt(data) + "\n\nIMPORTANT: Write the entire analysis in English, not Chinese."
-            result = call_ai(prompt, "", max_tokens=1500)
-            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Analysis failed: {str(e)[:100]}")
-
-    elif action == "en_career":
-        from career_data import format_career_text
-        from ai_reader import call_ai
-        chinese_text = format_career_text(data["manifest"]["single"], data["manifest"]["total"])
-        try:
-            prompt = f"Translate the following Chinese career guidance into natural English. Keep section titles bold. Translate accurately without adding or removing content:\n\n{chinese_text}"
-            result = call_ai(prompt, "", max_tokens=1500)
-            chunks = [result[i:i+4000] for i in range(0, len(result), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Translation failed: {str(e)[:100]}")
-
-    elif action == "en_love":
-        compatible = data.get("compatible_numbers", [])
-        single = data["manifest"]["single"]
-        text = f"💕 Relationship Compatibility\n\nYour Life Path Number {single} is most compatible with:\n\n"
-        for n in compatible:
-            meaning = NUMBER_MEANINGS.get(n, {})
-            text += f"• Number {n} ({meaning.get('name', '')}) — {meaning.get('keyword', '')}\n"
-        text += "\n💡 Compatibility is a guide, not a guarantee. Every relationship is unique."
+            text += f"• {n}（{meaning.get('name', '')}）— {meaning.get('keyword', '')}\n"
+        text += f"\n{t('love_disclaimer', lang)}"
         await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
-    elif action == "en_year":
-        py = data["personal_year_current"]
-        solar = data["solar"]
-        birth_month = solar["month"]
-        birth_day = solar["day"]
-        current_year = py["year"]
-        keyboard = [[
-            InlineKeyboardButton(f"📅 Before birthday {current_year}", callback_data="en_year_prev"),
-            InlineKeyboardButton(f"📅 After birthday {current_year}", callback_data="en_year_curr"),
-        ]]
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Has your {current_year} birthday ({birth_month}/{birth_day}) passed?\n\nIn numerology, your personal year energy begins on your birthday, not January 1st. Please select:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return SHOW_MENU
-
-    elif action in ("en_year_prev", "en_year_curr"):
-        year_type = "prev" if action == "en_year_prev" else "current"
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="⏳ Generating English annual forecast, please wait...")
-        try:
-            from ai_reader import get_year_detail
-            result = get_year_detail(data, "", year_type=year_type)
-            from ai_reader import call_ai
-            prompt = f"Translate this Chinese numerology annual forecast into natural English. Keep section titles bold:\n\n{result}"
-            translated = call_ai(prompt, "", max_tokens=1200)
-            chunks = [translated[i:i+4000] for i in range(0, len(translated), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Failed: {str(e)[:100]}")
-
-    elif action == "en_month_menu":
-        month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-        monthly = data["monthly_current"]
-        keyboard = []
-        row = []
-        for i, pm in enumerate(monthly):
-            row.append(InlineKeyboardButton(f"{month_names[i]}({pm['single']})", callback_data=f"en_month_{i+1}"))
-            if len(row) == 3:
-                keyboard.append(row)
-                row = []
-        if row:
-            keyboard.append(row)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"🗓 {data['personal_year_current']['year']} — Select a month to analyse:\n(Number in brackets = monthly energy number)",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return SHOW_MENU
-
-    elif action.startswith("en_month_"):
-        target_month = int(action.split("_")[2])
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⏳ Generating forecast for month {target_month}...")
-        try:
-            from ai_reader import get_monthly_detail, call_ai
-            result = get_monthly_detail(data, target_month, "")
-            prompt = f"Translate this Chinese numerology monthly forecast into natural English. Keep section titles bold:\n\n{result}"
-            translated = call_ai(prompt, "", max_tokens=800)
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=translated)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ Failed: {str(e)[:100]}")
+    elif action == "year_menu":
         current_year = data["personal_year_current"]["year"]
         solar = data["solar"]
-        birth_month = solar["month"]
-        birth_day = solar["day"]
         keyboard = [[
-            InlineKeyboardButton(f"📅 {current_year} 生日前", callback_data="year_current"),
-            InlineKeyboardButton(f"📅 {current_year} 生日後", callback_data="year_next"),
+            InlineKeyboardButton(t("btn_before_birthday", lang, year=current_year), callback_data="year_prev"),
+            InlineKeyboardButton(t("btn_after_birthday", lang, year=current_year), callback_data="year_curr"),
         ]]
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"你今年 {current_year} 的生日（{birth_month}/{birth_day}）過了嗎？\n\n生命靈數的流年運勢從生日當天開始，不是從1月1日。請根據你今年的生日是否已過來選擇：",
+            text=t("birthday_question", lang, year=current_year, month=solar["month"], day=solar["day"]),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return SHOW_MENU
 
-    elif action == "year_current":
-        # 生日前 → 看上一年
-        py = data["personal_year_current"]
-        prev_year = py["year"] - 1
-        await query.edit_message_text(f"📅 正在分析 {prev_year} 年流年（生日前適用），請稍候...")
+    elif action in ("year_prev", "year_curr"):
+        year_type = "prev" if action == "year_prev" else "current"
+        label_key = "analyzing_annual_prev" if action == "year_prev" else "analyzing_annual_curr"
+        await query.edit_message_text(t(label_key, lang))
         try:
-            detail = get_year_detail(data, "", year_type="prev")
+            detail = get_year_detail(data, "", year_type=year_type)
+            if lang != "zh_tw":
+                detail = await translate_text(detail, lang, context)
             chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
             for chunk in chunks:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
         except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 分析出錯：{str(e)[:100]}")
-
-    elif action == "year_next":
-        # 生日後 → 看今年
-        py = data["personal_year_current"]
-        await query.edit_message_text(f"📅 正在分析 {py['year']} 年流年（生日後適用），請稍候...")
-        try:
-            detail = get_year_detail(data, "", year_type="current")
-            chunks = [detail[i:i+4000] for i in range(0, len(detail), 4000)]
-            for chunk in chunks:
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
-        except Exception as e:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ 分析出錯：{str(e)[:100]}")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=t("error_analysis", lang, error=str(e)[:80]))
 
     elif action == "month_menu":
-        # 顯示12個月份按鈕
-        month_names = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]
+        month_names = t("month_names", lang)
         monthly = data["monthly_current"]
         keyboard = []
         row = []
         for i, pm in enumerate(monthly):
-            row.append(InlineKeyboardButton(
-                f"{month_names[i]}（{pm['single']}）",
-                callback_data=f"month_{i+1}"
-            ))
+            row.append(InlineKeyboardButton(f"{month_names[i]}（{pm['single']}）", callback_data=f"month_{i+1}"))
             if len(row) == 3:
                 keyboard.append(row)
                 row = []
         if row:
             keyboard.append(row)
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"🗓 *{data['personal_year_current']['year']}年 — 選擇要分析的月份：*\n括號內為該月流月數",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            text=f"🗓 {data['personal_year_current']['year']} — {t('select_month', lang)}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return SHOW_MENU
 
     elif action.startswith("month_"):
         target_month = int(action.split("_")[1])
         year = data["personal_year_current"]["year"]
-        await query.edit_message_text(f"📅 正在分析 {year} 年 {target_month} 月的流月，請稍候約15秒...")
-        detail = get_monthly_detail(data, target_month, "")
+        await query.edit_message_text(t("analyzing_monthly", lang, year=year, month=target_month))
         try:
+            detail = get_monthly_detail(data, target_month, "")
+            if lang != "zh_tw":
+                detail = await translate_text(detail, lang, context)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"🗓 {year}年{target_month}月流月分析\n\n{detail}",
+                text=f"{t('monthly_title', lang, year=year, month=target_month)}\n\n{detail}",
             )
-        except Exception:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=detail[:4000],
-            )
+        except Exception as e:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=t("error_analysis", lang, error=str(e)[:80]))
 
     elif action == "next_year":
         next_py = data["personal_year_next"]
         next_monthly = data["monthly_next"]
         birth_single = data["manifest"]["single"]
-        text = format_yearly_grid(next_py, next_monthly, next_py["year"], birth_single)
-        # 附上12個月流月數一覽
-        month_names = ["一","二","三","四","五","六","七","八","九","十","十一","十二"]
-        text += "\n\n*各月流月數一覽：*\n"
-        for i, pm in enumerate(next_monthly):
-            text += f"  {month_names[i]}月：{pm['single']}"
-            if (i + 1) % 4 == 0:
-                text += "\n"
-            else:
-                text += "　　"
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=text, parse_mode="Markdown"
-        )
+        text = format_yearly_grid(next_py, next_monthly, next_py["year"], birth_single, lang)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
     # 重新顯示選單
-    keyboard = [
-        [InlineKeyboardButton("🔮 命盤分析", callback_data="chart_menu")],
-        [InlineKeyboardButton("📅 流年詳解", callback_data="year_menu")],
-        [InlineKeyboardButton("🗓 選擇流月分析", callback_data="month_menu")],
-        [InlineKeyboardButton("🌐 English Version", callback_data="lang_en")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="還想了解什麼？",
-        reply_markup=reply_markup
+        text=t("want_more", lang),
+        reply_markup=main_keyboard(lang)
+    )
+    return SHOW_MENU
+
+
+async def translate_text(text: str, lang: str, context) -> str:
+    """把中文文字翻譯成目標語言"""
+    from ai_reader import call_ai
+    lang_names = {
+        "en": "English",
+        "zh_cn": "Simplified Chinese",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "km": "Khmer",
+        "vi": "Vietnamese",
+        "th": "Thai",
+    }
+    target = lang_names.get(lang, "English")
+    prompt = (
+        f"Translate the following numerology reading into {target}. "
+        f"Keep all section titles bold (with **). "
+        f"Translate naturally and warmly. Do not add or remove content.\n\n{text[:2000]}"
+    )
+    try:
+        return call_ai(prompt, "", max_tokens=1500)
+    except Exception:
+        return text
+
+
+async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = get_lang(context)
+    text = update.message.text.strip().replace("-", "/").replace(".", "/")
+
+    # 如果用戶按了「開始/Start」，顯示語言選單
+    if text.lower() in ["開始", "start", "/start"]:
+        return await start(update, context)
+
+    try:
+        parts = text.split("/")
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        assert 1900 <= year <= 2100
+        assert 1 <= month <= 12
+        assert 1 <= day <= 31
+    except Exception:
+        await update.message.reply_text(t("invalid_date", lang))
+        return ASK_DATE
+
+    context.user_data["year"] = year
+    context.user_data["month"] = month
+    context.user_data["day"] = day
+
+    await update.message.reply_text(t("ask_time", lang))
+    return ASK_TIME
+
+
+async def receive_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = get_lang(context)
+    text = update.message.text.strip()
+    skip_keywords = t("skip_keywords", lang)
+
+    birth_hour = None
+    if text not in skip_keywords:
+        try:
+            birth_hour = int(text)
+            assert 0 <= birth_hour <= 23
+        except Exception:
+            await update.message.reply_text(t("invalid_time", lang))
+            return ASK_TIME
+
+    context.user_data["hour"] = birth_hour
+    await update.message.reply_text(t("calculating", lang))
+
+    try:
+        data = full_analysis(
+            context.user_data["year"],
+            context.user_data["month"],
+            context.user_data["day"],
+            birth_hour
+        )
+        context.user_data["analysis"] = data
+    except Exception as e:
+        await update.message.reply_text(t("error_analysis", lang, error=str(e)))
+        return ConversationHandler.END
+
+    combined_text = format_combined_chart(data, lang)
+    yearly_text = format_yearly_grid(
+        data["personal_year_current"],
+        data["monthly_current"],
+        data["personal_year_current"]["year"],
+        data["manifest"]["single"],
+        lang
+    )
+
+    await update.message.reply_text(combined_text, parse_mode="Markdown")
+    await update.message.reply_text(yearly_text, parse_mode="Markdown")
+    await update.message.reply_text(
+        t("select_content", lang),
+        reply_markup=main_keyboard(lang)
     )
     return SHOW_MENU
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("已取消。輸入 /analyze 重新開始。")
+    lang = get_lang(context)
+    await update.message.reply_text(t("cancel_msg", lang))
     return ConversationHandler.END
 
 
-# ── 主程式 ────────────────────────────────────
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = get_lang(context)
+    await update.message.reply_text(t("welcome", lang))
+    return ASK_DATE
+
+
 def main():
     if not BOT_TOKEN:
         print("錯誤：請設定環境變數 BOT_TOKEN")
@@ -644,8 +475,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
-            CommandHandler("analyze", start),
-            MessageHandler(filters.Regex("^開始$"), start),
+            MessageHandler(filters.Regex("^(開始|Start)$"), start),
         ],
         states={
             ASK_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_date)],
@@ -659,7 +489,7 @@ def main():
     app.add_handler(conv_handler)
     app.add_handler(CommandHandler("help", help_cmd))
 
-    print("🤖 生命靈數 Bot 已啟動...")
+    print("🤖 生命靈數 Bot 已啟動（多語言版）...")
     app.run_polling()
 
 

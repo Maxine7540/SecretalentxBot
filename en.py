@@ -1,0 +1,78 @@
+"""English language file"""
+
+STRINGS = {
+    "select_language": "🌏 Please select your language / 請選擇語言",
+    "language_set": "✅ Language set to English",
+    "welcome": (
+        "✨ Welcome to the Numerology Bot!\n\n"
+        "Let me reveal your hidden talents:\n"
+        "☀️ Outer Personality Chart\n"
+        "🌙 Inner Spirit Chart\n"
+        "🔮 Combined In-Depth Reading\n\n"
+        "📅 Please enter your date of birth\n"
+        "Format: YYYY/MM/DD\n"
+        "Example: 1990/05/15"
+    ),
+    "ask_date": "📅 Please enter your date of birth\n\nFormat: YYYY/MM/DD\nExample: 1990/05/15",
+    "ask_time": "🕐 Please enter your birth hour (24-hour format, e.g. 14 = 2pm)\n\nIf unknown, type: skip",
+    "invalid_date": "⚠️ Invalid date format. Please try again\nExample: 1990/05/15",
+    "invalid_time": "⚠️ Invalid time. Please enter a number between 0-23, or type 'skip'",
+    "calculating": "⏳ Calculating your chart, please wait...",
+    "skip_keywords": ["skip", "unknown", "no", "略過", "無", "不知道"],
+    "chart_title": "✨ Numerology Chart",
+    "solar_label": "☀️ Solar (Gregorian) Birthday",
+    "lunar_label": "🌙 Lunar Birthday",
+    "talent_number": "Talent Number",
+    "life_number": "Life Path Number",
+    "outer_chart": "Outer Personality Chart",
+    "inner_chart": "Inner Spirit Chart",
+    "combined_chart": "Combined Chart Distribution",
+    "strong_number": "⚡ Dominant Numbers",
+    "missing_number": "🕳 Missing Numbers",
+    "none": "None",
+    "empty": "Missing",
+    "lunar_error": "⚠️ Lunar calendar conversion failed",
+    "annual_number": "Personal Year Number",
+    "personal_year_msg": "⭐ This is your Personal Year! Extra powerful energy ahead.",
+    "annual_hint": "💡 Tap a button below for your annual or monthly forecast",
+    "select_content": "What would you like to explore?",
+    "select_analysis": "Choose a reading:",
+    "want_more": "What else would you like to know?",
+    "btn_chart": "🔮 Chart Reading",
+    "btn_annual": "📅 Annual Forecast",
+    "btn_monthly": "🗓 Monthly Forecast",
+    "btn_language": "🌐 Change Language",
+    "btn_outer": "☀️ Outer Personality",
+    "btn_inner": "🌙 Inner Spirit",
+    "btn_combined": "🔮 Combined Reading",
+    "btn_career": "💼 Career",
+    "btn_love": "💕 Relationships",
+    "select_month": "Select a month to analyse:\n(Number in brackets = monthly energy number)",
+    "month_names": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+    "birthday_question": "Has your {year} birthday ({month}/{day}) passed?\n\nIn numerology, your personal year energy begins on your birthday, not January 1st. Please select:",
+    "btn_before_birthday": "📅 Before birthday {year}",
+    "btn_after_birthday": "📅 After birthday {year}",
+    "analyzing_annual_prev": "📅 Generating annual forecast (before birthday), please wait...",
+    "analyzing_annual_curr": "📅 Generating annual forecast (after birthday), please wait...",
+    "analyzing_monthly": "📅 Generating forecast for {year} month {month}, please wait...",
+    "monthly_title": "🗓 {year} Month {month} Forecast",
+    "analyzing_combined": "🔮 Generating combined reading, please wait about 60 seconds...",
+    "combined_title": "🔮 Combined Chart Reading",
+    "love_title": "💕 Relationship Compatibility",
+    "love_intro": "Your Life Path Number {single} is most compatible with:",
+    "love_disclaimer": "💡 Compatibility is a guide, not a guarantee. Every relationship is unique.",
+    "error_no_data": "⚠️ No data found. Please start again with /start",
+    "error_analysis": "⚠️ Analysis failed, please try again.\nError: {error}",
+    "cancel_msg": "Cancelled. Type /start to begin again.",
+    "year_themes": {
+        1: "New cycle begins — a year of planting seeds and taking action",
+        2: "Patience and partnerships — a year of cooperation and relationships",
+        3: "Express yourself — a year of creativity and social connection",
+        4: "Build and grind — a year of laying solid foundations",
+        5: "Change and freedom — a year of breaking out of your comfort zone",
+        6: "Responsibility and family — a year of healing and restoration",
+        7: "Inner reflection — a year of spiritual growth and wisdom",
+        8: "Harvest season — a year of achievement and financial focus",
+        9: "Let go and complete — a year of endings and completion",
+    },
+}
